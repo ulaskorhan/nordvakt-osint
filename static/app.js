@@ -174,28 +174,164 @@ setInterval(() => { if (mapVisible()) refreshVessels(); }, 10000);
 setInterval(() => { if (mapVisible()) refreshAlerts(); }, 10000);
 
 // ---------- Selskapsnettverk ----------
+// Hierarkisk visning: rolleinnehavere som kort til venstre, selskapet til høyre,
+// morselskap lenger til høyre. Kortene er farget etter rolletype.
+const ROLE_GROUPS = [
+  { navn: "Ledelse", farge: "#f0c450", match: /daglig leder|styrets leder|nestleder|innehaver|forretningsfører/i },
+  { navn: "Styremedlem", farge: "#4fb3d9", match: /styremedlem/i },
+  { navn: "Varamedlem", farge: "#8592a3", match: /vara/i },
+  { navn: "Revisor og regnskap", farge: "#b083f0", match: /revisor|regnskap/i },
+  { navn: "Andre roller", farge: "#7ee0c3", match: /./ },
+];
+const roleGroup = (roles) => Math.min(...roles.map((r) => ROLE_GROUPS.findIndex((g) => g.match.test(r))));
+
 const cy = cytoscape({
   container: document.getElementById("graph"),
   style: [
     { selector: "node", style: {
-      label: "data(label)", color: "#d8dee6", "font-size": 10, "text-valign": "bottom", "text-margin-y": 4,
-      "text-wrap": "ellipsis", "text-max-width": 140, width: 18, height: 18,
+      shape: "round-rectangle", width: "data(w)", height: "data(h)", label: "data(text)",
+      "text-wrap": "wrap", "text-max-width": 300, "text-valign": "center", "text-halign": "center",
+      "font-size": 10, "line-height": 1.35, color: "#d8dee6",
+      "background-color": "#151b23", "border-width": 1, "border-color": "data(farge)",
     } },
-    { selector: 'node[type="selskap"]', style: { shape: "round-rectangle", "background-color": "#4fb3d9" } },
-    { selector: 'node[type="selskap"][!utvidet]', style: { "background-color": "#2a5a6e", "border-width": 1, "border-color": "#4fb3d9" } },
-    { selector: 'node[type="person"]', style: { shape: "ellipse", "background-color": "#d4a72c" } },
-    { selector: "node[?flagg]", style: { "border-width": 3, "border-color": "#e5534b" } },
-    { selector: "node[degree > 1][type=\"person\"]", style: { width: 26, height: 26, "background-color": "#f0c450" } },
+    { selector: 'node[kind="hoved"]', style: {
+      "background-color": "#173e4d", "border-color": "#4fb3d9", "border-width": 2, "font-size": 11, "font-weight": "bold",
+    } },
+    { selector: 'node[kind="uutvidet"]', style: { "border-style": "dashed", "border-color": "#4fb3d9", color: "#8592a3" } },
+    { selector: "node[?delt]", style: { "border-width": 3, "background-color": "#262010" } },
     { selector: "edge", style: {
-      width: 1, "line-color": "#3a4552", "curve-style": "bezier", "target-arrow-shape": "triangle",
-      "target-arrow-color": "#3a4552", "arrow-scale": 0.7, label: "data(label)", "font-size": 8,
-      color: "#8592a3", "text-rotation": "autorotate", "text-background-color": "#0d1117", "text-background-opacity": 1,
+      width: 1, "line-color": "#2f3843", "curve-style": "taxi", "taxi-direction": "horizontal", "taxi-turn": "50%",
     } },
-    { selector: ":selected", style: { "border-width": 3, "border-color": "#ffffff" } },
+    { selector: "edge.felles", style: { "curve-style": "bezier", "line-color": "#5a4a2d", "line-style": "dashed" } },
+    { selector: "edge.hl", style: {
+      "line-color": "#8592a3", width: 1.5, label: "data(label)", "font-size": 9, color: "#d8dee6",
+      "text-background-color": "#0d1117", "text-background-opacity": 1, "text-background-padding": 2,
+    } },
+    { selector: ".faded", style: { opacity: 0.15 } },
+    { selector: "node:selected", style: { "border-color": "#ffffff", "border-width": 2 } },
   ],
   layout: { name: "preset" },
+  minZoom: 0.1,
+  maxZoom: 2,
   wheelSensitivity: 0.3,
 });
+
+function decorateNodes() {
+  cy.nodes().forEach((n) => {
+    const asHolder = n.outgoers("edge").filter((e) => e.data("label") !== "Del av");
+    const roles = [...new Set(asHolder.map((e) => e.data("label")))];
+    const companies = new Set(asHolder.map((e) => e.target().id()));
+    const expanded = n.data("type") === "selskap" && n.data("utvidet");
+    let kind, sub;
+    if (expanded) { kind = "hoved"; sub = `Org.nr. ${n.id()}`; }
+    else if (roles.length) { kind = "rolle"; sub = roles.join(" · "); }
+    else { kind = "uutvidet"; sub = "Klikk for å utvide"; }
+    const group = roles.length && !expanded ? roleGroup(roles) : -1;
+    // Fast bredde gir rette kolonner; teksten kortes ned i stedet
+    n.data({
+      text: [trunc(n.data("label"), 34), trunc(sub, 38)].join("\n"), kind, delt: companies.size > 1,
+      w: kind === "hoved" ? 240 : 220,
+      h: kind === "hoved" ? 46 : 38,
+      farge: group >= 0 ? ROLE_GROUPS[group].farge : "#4a5360",
+      rank: kind === "hoved" ? -1 : group >= 0 ? group : 9,
+    });
+  });
+}
+
+// Kjører dagre (venstre mot høyre) på et utsnitt og returnerer posisjoner og omriss
+function dagreBlock(nodes, edges) {
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({ rankdir: "LR", nodesep: 10, ranksep: 110 });
+  g.setDefaultEdgeLabel(() => ({}));
+  // Innsettingsrekkefølgen styrer rekkefølgen innenfor en kolonne: ledelse øverst, vara nederst
+  nodes.sort((a, b) => a.data("rank") - b.data("rank"))
+    .forEach((n) => g.setNode(n.id(), { width: n.data("w"), height: n.data("h") }));
+  edges.forEach((e) => {
+    if (g.hasNode(e.source().id()) && g.hasNode(e.target().id())) g.setEdge(e.source().id(), e.target().id());
+  });
+  dagre.layout(g);
+  const pos = {};
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  nodes.forEach((n) => {
+    const p = g.node(n.id());
+    pos[n.id()] = p;
+    minX = Math.min(minX, p.x - p.width / 2); maxX = Math.max(maxX, p.x + p.width / 2);
+    minY = Math.min(minY, p.y - p.height / 2); maxY = Math.max(maxY, p.y + p.height / 2);
+  });
+  return { pos, minX, minY, w: maxX - minX, h: maxY - minY };
+}
+
+// Ett utvidet selskap: ett organisasjonskart. Flere: én blokk per selskap i et rutenett,
+// og det de deler (personer, revisorer) i en egen rad øverst.
+function layoutNetwork(focusId) {
+  const companies = cy.nodes('[kind="hoved"]');
+  cy.edges().removeClass("felles");
+  if (companies.length <= 1) {
+    const b = dagreBlock(cy.nodes(), cy.edges());
+    cy.nodes().forEach((n) => n.position({ x: b.pos[n.id()].x, y: b.pos[n.id()].y }));
+    fitReadable(cy.elements());
+    return;
+  }
+
+  const owners = (n) => {
+    const ids = new Set();
+    n.outgoers("edge").forEach((e) => { if (e.target().data("kind") === "hoved") ids.add(e.target().id()); });
+    n.incomers("edge").forEach((e) => { if (e.source().data("kind") === "hoved") ids.add(e.source().id()); });
+    return ids;
+  };
+  const blockOf = new Map(companies.map((c) => [c.id(), [c]]));
+  const shared = [];
+  cy.nodes().not(companies).forEach((n) => {
+    const o = [...owners(n)];
+    if (o.length === 1) blockOf.get(o[0]).push(n); else shared.push(n);
+  });
+
+  const GAP_X = 90, GAP_Y = 140, ROW_MAX = 3;
+  const blocks = [...blockOf.values()].map((ns) => ({ nodes: ns, ...dagreBlock(cy.collection(ns), cy.edges()) }));
+  let x = 0, y = 0, rowH = 0, col = 0, totalW = 0;
+  for (const b of blocks) {
+    if (col === ROW_MAX) { x = 0; y += rowH + GAP_Y; rowH = 0; col = 0; }
+    for (const n of b.nodes) {
+      const p = b.pos[n.id()];
+      n.position({ x: x + p.x - b.minX, y: y + p.y - b.minY });
+    }
+    x += b.w + GAP_X; totalW = Math.max(totalW, x - GAP_X); rowH = Math.max(rowH, b.h); col += 1;
+  }
+
+  // Felles koblinger: rad(er) over blokkene, sentrert
+  const PER_ROW = Math.max(1, Math.floor(totalW / 250));
+  shared.sort((a, b) => a.data("rank") - b.data("rank")).forEach((n, i) => {
+    const row = Math.floor(i / PER_ROW), inRow = Math.min(PER_ROW, shared.length - row * PER_ROW);
+    const start = (totalW - inRow * 250) / 2 + 125;
+    n.position({ x: start + (i % PER_ROW) * 250, y: -160 - row * 60 });
+  });
+  // Kanter mellom blokker (og fra felles-raden) tegnes stiplet og buet i stedet for i trapp
+  const blockKey = new Map();
+  blockOf.forEach((ns, key) => ns.forEach((n) => blockKey.set(n.id(), key)));
+  cy.edges().filter((e) => blockKey.get(e.source().id()) !== blockKey.get(e.target().id())).addClass("felles");
+
+  const focus = focusId && blockOf.get(focusId);
+  fitReadable(focus ? cy.collection(focus) : cy.elements());
+}
+
+// Tilpass utsnittet, men aldri så langt ut at teksten ikke kan leses ved første blikk
+function fitReadable(eles) {
+  cy.fit(eles, 30);
+  if (cy.zoom() > 1) { cy.zoom(1); cy.center(eles); }
+}
+
+cy.on("mouseover", "node", (evt) => {
+  const hood = evt.target.closedNeighborhood();
+  cy.elements().not(hood).addClass("faded");
+  hood.edges().addClass("hl");
+});
+cy.on("mouseout", "node", () => cy.elements().removeClass("faded hl"));
+
+document.getElementById("graph-legend").innerHTML =
+  ROLE_GROUPS.map((g) => `<span><i style="border-color:${g.farge}"></i>${g.navn}</span>`).join("")
+  + '<span><i style="border-color:#4fb3d9;background:#173e4d;border-width:2px"></i>Utvidet selskap</span>'
+  + '<span><i style="border-color:#4fb3d9;border-style:dashed"></i>Ikke utvidet</span>'
+  + '<span><i style="border-color:#f0c450;background:#262010;border-width:3px"></i>Rolle i flere selskaper</span>';
 
 function mergeNetwork(net, focusId) {
   const added = [];
@@ -212,8 +348,8 @@ function mergeNetwork(net, focusId) {
     if (cy.getElementById(id).empty()) added.push({ group: "edges", data: { id, ...e } });
   }
   cy.add(added);
-  cy.nodes().forEach((n) => n.data("degree", n.connectedEdges().length));
-  cy.layout({ name: "cose", animate: false, nodeRepulsion: 9000, idealEdgeLength: 90, randomize: false }).run();
+  decorateNodes();
+  layoutNetwork(focusId);
   if (focusId) cy.getElementById(focusId).select();
 }
 
@@ -329,7 +465,13 @@ document.getElementById("load-all").addEventListener("click", async () => {
   for (const e of EXAMPLES) await expandCompany(e.orgnr);
 });
 
-cy.on("add remove", () => { document.getElementById("graph-empty").hidden = cy.elements().nonempty(); });
+cy.on("add remove", () => {
+  const hasGraph = cy.elements().nonempty();
+  document.getElementById("graph-empty").hidden = hasGraph;
+  document.getElementById("graph-legend").hidden = !hasGraph;
+  document.getElementById("graph-fit").hidden = !hasGraph;
+});
+document.getElementById("graph-fit").addEventListener("click", () => { cy.stop(true); cy.fit(cy.elements(), 30); });
 
 // ---------- Nyheter ----------
 const newsLayer = L.layerGroup();

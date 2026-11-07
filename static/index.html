@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nordvakt</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
-  <link rel="stylesheet" href="/static/style.css?v=8">
+  <link rel="stylesheet" href="/static/style.css?v=11">
 </head>
 <body>
   <header>
@@ -112,6 +112,8 @@
     <section id="view-nettverk" class="view">
       <div class="graph-wrap">
         <div id="graph"></div>
+        <div id="graph-legend" class="graph-legend" hidden></div>
+        <button id="graph-fit" class="graph-fit secondary" hidden>Vis hele grafen</button>
         <div id="graph-empty">
           <div class="empty-inner">
             <h2>Kom i gang med et eksempel</h2>
@@ -150,6 +152,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
-  <script src="/static/app.js?v=7"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+  <script src="/static/app.js?v=11"></script>
 </body>
 </html>

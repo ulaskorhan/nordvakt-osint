@@ -1,0 +1,14 @@
+{
+  "_merknad": "Omtrentlige koordinater hentet fra åpne kart. Rediger fritt: radius_km styrer hvor stor sonen er.",
+  "soner": [
+    {"id": "kollsnes", "navn": "Kollsnes gassprosessanlegg", "kategori": "energi", "lat": 60.551, "lon": 4.835, "radius_km": 5},
+    {"id": "mongstad", "navn": "Mongstad raffineri og terminal", "kategori": "energi", "lat": 60.808, "lon": 5.032, "radius_km": 5},
+    {"id": "karsto", "navn": "Kårstø gassprosessanlegg", "kategori": "energi", "lat": 59.272, "lon": 5.517, "radius_km": 5},
+    {"id": "nyhamna", "navn": "Nyhamna gassanlegg", "kategori": "energi", "lat": 62.849, "lon": 6.950, "radius_km": 5},
+    {"id": "tjeldbergodden", "navn": "Tjeldbergodden", "kategori": "energi", "lat": 63.405, "lon": 8.693, "radius_km": 4},
+    {"id": "melkoya", "navn": "Melkøya (Hammerfest LNG)", "kategori": "energi", "lat": 70.687, "lon": 23.597, "radius_km": 5},
+    {"id": "haakonsvern", "navn": "Haakonsvern orlogsstasjon", "kategori": "forsvar", "lat": 60.333, "lon": 5.233, "radius_km": 4},
+    {"id": "ramsund", "navn": "Ramsund orlogsstasjon", "kategori": "forsvar", "lat": 68.480, "lon": 16.530, "radius_km": 4},
+    {"id": "olavsvern", "navn": "Olavsvern (Ramfjorden)", "kategori": "forsvar", "lat": 69.535, "lon": 19.006, "radius_km": 4}
+  ]
+}

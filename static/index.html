@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nordvakt</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">NORDVAKT <span>OSINT · Norge</span></div>
+    <nav>
+      <button class="tab active" data-view="maritim">Maritim</button>
+      <button class="tab" data-view="nettverk">Selskapsnettverk</button>
+      <button class="tab" data-view="kildelogg">Kildelogg</button>
+    </nav>
+    <div id="ais-status" class="pill">AIS: kobler til…</div>
+  </header>
+
+  <main>
+    <section id="view-maritim" class="view active">
+      <div id="map"></div>
+      <aside class="panel">
+        <div class="block">
+          <input id="vessel-filter" type="search" placeholder="Filtrer på navn, MMSI eller flagg">
+          <label class="check"><input id="only-foreign" type="checkbox"> Skjul norskflaggede</label>
+          <div id="legend" class="legend"></div>
+        </div>
+        <div class="block" id="vessel-detail" hidden></div>
+        <div class="block grow">
+          <h3>Varsler <small id="alert-count"></small></h3>
+          <p class="hint">Varsler er indikatorer, ikke funn. De må vurderes manuelt.</p>
+          <ul id="alerts" class="list"></ul>
+        </div>
+      </aside>
+    </section>
+
+    <section id="view-nettverk" class="view">
+      <div id="graph"></div>
+      <aside class="panel">
+        <div class="block">
+          <form id="org-search">
+            <input id="org-q" type="search" placeholder="Selskapsnavn eller org.nr.">
+            <button type="submit">Søk</button>
+          </form>
+          <label class="check"><input id="include-former" type="checkbox"> Ta med avregistrerte roller</label>
+          <button id="graph-reset" class="secondary">Nullstill graf</button>
+          <ul id="org-results" class="list"></ul>
+        </div>
+        <div class="block grow" id="node-detail">
+          <p class="hint">Søk opp et selskap og legg det til i grafen. Klikk på et selskap i grafen for å utvide det med rolleinnehaverne. Personer som går igjen i flere selskaper kobles automatisk.</p>
+        </div>
+      </aside>
+    </section>
+
+    <section id="view-kildelogg" class="view">
+      <div class="table-wrap">
+        <p class="hint">Hvert oppslag mot eksterne kilder logges med tidspunkt (UTC), URL og SHA-256 av svaret.</p>
+        <table>
+          <thead><tr><th>Tidspunkt</th><th>Kilde</th><th>Status</th><th>URL</th><th>SHA-256</th></tr></thead>
+          <tbody id="log-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

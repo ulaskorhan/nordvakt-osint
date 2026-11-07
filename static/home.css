@@ -31,6 +31,20 @@ section { margin-bottom: 88px; }
 h1 { font-size: clamp(36px, 6vw, 56px); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 24px; font-weight: 650; }
 .lead { color: var(--muted); font-size: 18px; max-width: 620px; margin: 0 0 36px; }
 
+.search { display: flex; gap: 8px; max-width: 620px; }
+.search input {
+  flex: 1; min-width: 0; font: inherit; font-size: 17px; padding: 13px 16px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+}
+.search input:focus { outline: none; border-color: var(--accent); }
+.search button {
+  font: inherit; font-size: 15px; padding: 0 22px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--text); background: var(--text); color: var(--bg);
+}
+.search button:hover { background: #fff; }
+.examples { color: var(--muted); font-size: 14px; margin: 14px 0 0; }
+.examples a { color: var(--accent); text-decoration: none; }
+.examples a:hover { text-decoration: underline; }
 .cta { display: flex; gap: 12px; flex-wrap: wrap; }
 .btn {
   display: inline-block; padding: 11px 20px; border-radius: 8px; text-decoration: none;

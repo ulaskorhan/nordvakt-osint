@@ -13,7 +13,7 @@ function showView(view) {
   if (!btn) return;
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b === btn));
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${view}`));
-  if (view === "maritim") map.invalidateSize();
+  if (view === "maritim") { map.invalidateSize(); refreshVessels(); refreshAlerts(); }
   if (view === "nettverk") cy.resize();
   if (view === "kildelogg") loadLog();
   if (view === "nyheter") loadNews();
@@ -26,7 +26,7 @@ document.querySelectorAll(".tab").forEach((btn) => btn.addEventListener("click",
   history.replaceState(null, "", `#${btn.dataset.view}`);
   showView(btn.dataset.view);
 }));
-window.addEventListener("hashchange", () => showView(location.hash.slice(1)));
+window.addEventListener("hashchange", () => route());
 
 // ---------- Maritim ----------
 const CATEGORY_COLORS = {
@@ -168,8 +168,10 @@ document.getElementById("only-foreign").addEventListener("change", renderVessels
 
 refreshStatus(); refreshVessels(); refreshAlerts();
 setInterval(refreshStatus, 5000);
-setInterval(refreshVessels, 10000);
-setInterval(refreshAlerts, 10000);
+// Rundt 4 000 fartøy: hentes bare når kartet faktisk vises
+const mapVisible = () => document.getElementById("view-maritim").classList.contains("active");
+setInterval(() => { if (mapVisible()) refreshVessels(); }, 10000);
+setInterval(() => { if (mapVisible()) refreshAlerts(); }, 10000);
 
 // ---------- Selskapsnettverk ----------
 const cy = cytoscape({
@@ -450,7 +452,217 @@ loadPlaces();
 setInterval(loadPlaces, 120000);
 setInterval(() => { if (document.getElementById("view-nyheter").classList.contains("active")) loadNews(); }, 60000);
 
-if (location.hash) showView(location.hash.slice(1));
+// ---------- Søk og entiteter ----------
+// Ruter: #sok, #sok=<spørring>, #e=<entitets-id>
+const TYPES = {
+  zone: { flertall: "Overvåkingssoner", entall: "Overvåkingssone", farge: "#ff7bd5" },
+  place: { flertall: "Steder", entall: "Sted", farge: "#7ee0c3" },
+  org: { flertall: "Organisasjoner", entall: "Organisasjon", farge: "#4fb3d9" },
+  vessel: { flertall: "Fartøy", entall: "Fartøy", farge: "#57c785" },
+  article: { flertall: "Nyhetssaker", entall: "Nyhetssak", farge: "#f0c450" },
+  person: { flertall: "Personer med roller", entall: "Person", farge: "#d4a72c" },
+};
+const TYPE_ORDER = ["zone", "place", "org", "vessel", "article", "person"];
+const PROP_LABELS = {
+  orgnr: "Org.nr.", form: "Form", naering: "Næring", adresse: "Adresse", ansatte: "Ansatte", stiftet: "Stiftet",
+  status: "Status", mmsi: "MMSI", flagg: "Flagg", kategori: "Kategori", kallesignal: "Kallesignal",
+  destinasjon: "Destinasjon", fart: "Fart (kn)", kurs: "Kurs", radius_km: "Radius (km)", operator: "Operatør",
+  stedstype: "Stedstype", kommune: "Kommune", medium: "Medium",
+};
+const TIME_LABEL = { vessel: "Sist hørt", org: "Stiftet", article: "Publisert" };
+const entityHref = (id) => `#e=${encodeURIComponent(id)}`;
+const typeDot = (t) => `<i class="type-dot" style="background:${TYPES[t]?.farge || "#888"}"></i>`;
+const trunc = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
+function route() {
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (h.startsWith("e=")) { showView("sok"); openEntity(h.slice(2)); }
+  else if (h.startsWith("sok=")) { showView("sok"); runSearch(h.slice(4)); }
+  else showView(h || "sok");
+}
+
+function resultRow(e, rel = "") {
+  const inner = `${typeDot(e.type)}<span>${esc(e.label)}</span><span class="meta">${esc(e.beskrivelse || "")}</span>${rel ? `<span class="rel">${esc(rel)}</span>` : ""}`;
+  // Personer kan ikke åpnes som egne sider, de vises bare som roller
+  return e.type === "person"
+    ? `<div class="result-row" style="cursor:default">${inner}</div>`
+    : `<a class="result-row" href="${entityHref(e.id)}">${inner}</a>`;
+}
+
+function showSearchPart(part) {
+  document.getElementById("sok-start").hidden = part !== "start";
+  document.getElementById("sok-results").hidden = part !== "results";
+  document.getElementById("entity-page").hidden = part !== "entity";
+}
+
+async function runSearch(q) {
+  document.getElementById("global-q").value = q;
+  showSearchPart("results");
+  const out = document.getElementById("sok-results");
+  out.innerHTML = '<p class="hint">Søker i alle kilder…</p>';
+  try {
+    const r = await getJSON(`/api/search?q=${encodeURIComponent(q)}`);
+    const errors = Object.keys(r.feil);
+    out.innerHTML = (r.grupper.length ? r.grupper.map((g) => `
+      <div class="result-group">
+        <h3>${TYPES[g.type].flertall} <small>${g.treff.length}</small></h3>
+        ${g.treff.map((e) => resultRow(e)).join("")}
+      </div>`).join("") : `<p class="hint">Ingen treff på «${esc(q)}».</p>`)
+      + (errors.length ? `<p class="hint">Svarte ikke: ${errors.map(esc).join(", ")}</p>` : "");
+  } catch (e) {
+    out.innerHTML = `<p class="hint">Søket feilet: ${esc(e.message)}</p>`;
+  }
+}
+
+document.getElementById("global-search").addEventListener("submit", (evt) => {
+  evt.preventDefault();
+  const q = document.getElementById("global-q").value.trim();
+  if (!q) return;
+  const hash = `#sok=${encodeURIComponent(q)}`;
+  if (location.hash === hash) runSearch(q); else location.hash = hash;
+});
+
+let entityMap, entityLayer, entityCy;
+let entityRequest = 0;
+
+async function openEntity(id) {
+  const req = ++entityRequest;
+  showSearchPart("entity");
+  document.getElementById("entity-head").innerHTML = '<p class="hint">Henter fra alle kilder…</p>';
+  let r;
+  try {
+    r = await getJSON(`/api/entity?id=${encodeURIComponent(id)}`);
+  } catch {
+    if (req === entityRequest) document.getElementById("entity-head").innerHTML = '<p class="hint">Fant ikke entiteten. Fartøy forsvinner fra strømmen etter 30 minutter uten signal.</p>';
+    return;
+  }
+  if (req !== entityRequest) return; // brukeren har navigert videre
+  document.querySelector(".sok-main").scrollTop = 0;
+  renderEntityHead(r);
+  renderEntityMap(r);
+  renderEntityGraph(r);
+  renderTimeline(r);
+  renderRelated(r);
+}
+
+function renderEntityHead(r) {
+  const e = r.entity;
+  const props = Object.entries(e.props).filter(([k]) => PROP_LABELS[k])
+    .map(([k, v]) => `<dt>${PROP_LABELS[k]}</dt><dd>${esc(v)}</dd>`).join("");
+  const links = [];
+  if (e.props.lenke) links.push(`<a href="${esc(safeUrl(e.props.lenke))}" target="_blank" rel="noopener">Les saken hos ${esc(e.props.medium)}</a>`);
+  if (e.id.startsWith("org:")) links.push(`<a href="https://virksomhet.brreg.no/nb/oppslag/enheter/${encodeURIComponent(e.props.orgnr)}" target="_blank" rel="noopener">Åpne i Brønnøysundregistrene</a>`);
+  if (e.props.hjemmeside) links.push(`<a href="${esc(safeUrl(/^https?:/.test(e.props.hjemmeside) ? e.props.hjemmeside : `https://${e.props.hjemmeside}`))}" target="_blank" rel="noopener">Hjemmeside</a>`);
+  if (e.type === "vessel") links.push(`<a href="https://www.marinetraffic.com/no/ais/details/ships/mmsi:${encodeURIComponent(e.props.mmsi)}" target="_blank" rel="noopener">MarineTraffic</a>`);
+  const sources = [...new Set([e.kilde, ...r.relaterte.map((x) => x.kilde), ...r.relasjoner.map((x) => x.kilde)])];
+  const errors = Object.keys(r.feil);
+  document.getElementById("entity-head").innerHTML = `
+    <div class="type-badge">${typeDot(e.type)}${TYPES[e.type].entall}</div>
+    <h1>${esc(e.label)}</h1>
+    ${e.beskrivelse ? `<p class="desc">${esc(e.beskrivelse)}</p>` : ""}
+    ${e.props.uavklart ? '<p class="hint">Navnet er hentet fra nyhetene. Treff i Enhetsregisteret med samme navn vises som «Mulig samme som».</p>' : ""}
+    ${props ? `<dl>${props}</dl>` : ""}
+    ${links.length ? `<p class="hint" style="margin-top:10px">${links.join(" · ")}</p>` : ""}
+    <div class="sources">Kilder: ${sources.map(esc).join(", ")}${errors.length ? ` · Svarte ikke: ${errors.map(esc).join(", ")}` : ""}</div>`;
+}
+
+function renderEntityMap(r) {
+  if (!entityMap) {
+    entityMap = L.map("entity-map", { preferCanvas: true }).setView([64.5, 11], 4);
+    L.tileLayer("https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/{z}/{y}/{x}.png", {
+      maxZoom: 18, className: "dark-tiles", attribution: "&copy; Kartverket",
+    }).addTo(entityMap);
+    entityLayer = L.layerGroup().addTo(entityMap);
+  }
+  entityMap.invalidateSize();
+  entityLayer.clearLayers();
+  const located = [r.entity, ...r.relaterte].filter((x) => x.lat != null && x.lon != null);
+  document.getElementById("entity-map-empty").hidden = located.length > 0;
+  for (const x of located) {
+    const color = TYPES[x.type].farge;
+    if (x.type === "zone") {
+      L.circle([x.lat, x.lon], { radius: x.props.radius_km * 1000, color, weight: 1, fillOpacity: 0.08, dashArray: "4 4" }).addTo(entityLayer);
+    }
+    const center = x.id === r.entity.id;
+    L.circleMarker([x.lat, x.lon], {
+      radius: center ? 9 : 6, weight: center ? 2 : 1, color: center ? "#ffffff" : "#0d1117", fillColor: color, fillOpacity: 0.95,
+    }).bindTooltip(esc(x.label)).on("click", () => { location.hash = entityHref(x.id); }).addTo(entityLayer);
+  }
+  if (located.length === 1) entityMap.setView([located[0].lat, located[0].lon], located[0].type === "zone" ? 11 : 12);
+  else if (located.length > 1) entityMap.fitBounds(L.latLngBounds(located.map((x) => [x.lat, x.lon])), { padding: [30, 30], maxZoom: 13 });
+}
+
+function renderEntityGraph(r) {
+  if (!entityCy) {
+    entityCy = cytoscape({
+      container: document.getElementById("entity-graph"),
+      style: [
+        { selector: "node", style: {
+          label: "data(label)", color: "#d8dee6", "font-size": 9, "text-valign": "bottom", "text-margin-y": 3,
+          "text-wrap": "ellipsis", "text-max-width": 110, width: 14, height: 14, "background-color": "data(color)",
+        } },
+        { selector: "node[?center]", style: { width: 26, height: 26, "border-width": 2, "border-color": "#ffffff", "font-size": 11, "font-weight": "bold" } },
+        { selector: "edge", style: {
+          width: 1, "line-color": "#3a4552", "curve-style": "bezier", label: "data(label)", "font-size": 7,
+          color: "#8592a3", "text-rotation": "autorotate", "text-background-color": "#0d1117", "text-background-opacity": 1,
+        } },
+        { selector: "edge[?skjul]", style: { label: "" } },
+      ],
+      maxZoom: 1.4,
+      wheelSensitivity: 0.3,
+    });
+    entityCy.on("tap", "node", (evt) => {
+      const n = evt.target;
+      if (n.data("type") !== "person" && !n.data("center")) location.hash = entityHref(n.id());
+    });
+  }
+  entityCy.elements().remove();
+  const nodes = [r.entity, ...r.relaterte].map((x) => ({
+    data: { id: x.id, label: trunc(x.label, 40), type: x.type, color: TYPES[x.type].farge, center: x.id === r.entity.id },
+  }));
+  const ids = new Set(nodes.map((n) => n.data.id));
+  const rels = r.relasjoner.filter((rel) => ids.has(rel.fra) && ids.has(rel.til));
+  const edges = rels.map((rel, i) => ({ data: { id: `r${i}`, source: rel.fra, target: rel.til, label: rel.label, skjul: rels.length > 25 } }));
+  entityCy.add([...nodes, ...edges]);
+  entityCy.resize();
+  entityCy.layout({
+    name: "concentric", concentric: (n) => (n.data("center") ? 2 : 1), levelWidth: () => 1,
+    minNodeSpacing: 14, animate: false, padding: 24,
+  }).run();
+}
+
+function relationLabels(r) {
+  const labels = new Map();
+  for (const rel of r.relasjoner) {
+    const other = rel.fra === r.entity.id ? rel.til : rel.til === r.entity.id ? rel.fra : null;
+    if (!other) continue;
+    labels.set(other, [...(labels.get(other) || []), rel.label]);
+  }
+  return labels;
+}
+
+function renderTimeline(r) {
+  const items = [r.entity, ...r.relaterte].filter((x) => x.tid).sort((a, b) => b.tid - a.tid).slice(0, 40);
+  document.getElementById("entity-timeline").innerHTML = items.length ? items.map((x) => {
+    const when = x.type === "org"
+      ? new Date(x.tid * 1000).toLocaleDateString("no-NO", { dateStyle: "medium" })
+      : new Date(x.tid * 1000).toLocaleString("no-NO", { dateStyle: "medium", timeStyle: "short" });
+    const label = x.id === r.entity.id ? `<b>${esc(x.label)}</b>` : `<a href="${entityHref(x.id)}">${esc(x.label)}</a>`;
+    return `<li style="--dot:${TYPES[x.type].farge}"><div class="when">${TIME_LABEL[x.type] || "Tid"} ${when} · ${TYPES[x.type].entall}</div>${label}</li>`;
+  }).join("") : '<li class="hint">Ingen tidfestede hendelser.</li>';
+}
+
+function renderRelated(r) {
+  const labels = relationLabels(r);
+  const groups = TYPE_ORDER.map((t) => [t, r.relaterte.filter((x) => x.type === t)]).filter(([, xs]) => xs.length);
+  document.getElementById("entity-related").innerHTML = groups.length ? groups.map(([t, xs]) => `
+    <div class="related-group">
+      <h4>${TYPES[t].flertall} (${xs.length})</h4>
+      ${xs.slice(0, 50).map((x) => resultRow(x, [...new Set(labels.get(x.id) || [])].join(", "))).join("")}
+    </div>`).join("") : '<p class="hint">Ingen kilder fant noe relatert.</p>';
+}
+
+route();
 
 // ---------- Kildelogg ----------
 async function loadLog() {

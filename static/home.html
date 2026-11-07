@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nordvakt</title>
   <meta name="description" content="Et enkelt verktøy som viser hvordan åpne kilder kan brukes til OSINT i Norge.">
-  <link rel="stylesheet" href="/static/home.css?v=2">
+  <link rel="stylesheet" href="/static/home.css?v=3">
 </head>
 <body>
   <header class="top">
     <span class="brand">NORDVAKT</span>
-    <a href="/app#maritim" class="top-link">Åpne verktøyet →</a>
+    <a href="/app#sok" class="top-link">Åpne verktøyet →</a>
   </header>
 
   <main>
@@ -21,10 +21,16 @@
         Nordvakt er et enkelt verktøy som viser hva OSINT er i praksis: innhenting og analyse av informasjon som er fritt tilgjengelig.
         Målet er å gi både nysgjerrige og viderekomne konkrete ideer om hvordan offentlige norske data kan brukes.
       </p>
-      <div class="cta">
-        <a class="btn primary" href="/app#maritim">Se skipstrafikken</a>
-        <a class="btn" href="/app#nettverk">Utforsk selskaper</a>
-      </div>
+      <form class="search" id="home-search">
+        <input id="home-q" type="search" placeholder="Søk etter sted, selskap, fartøy eller nyhet" autocomplete="off">
+        <button type="submit">Søk</button>
+      </form>
+      <p class="examples">Prøv
+        <a href="/app#sok=Kårstø">Kårstø</a>,
+        <a href="/app#sok=Gassco">Gassco</a>,
+        <a href="/app#sok=Hammerfest">Hammerfest</a> eller
+        <a href="/app#sok=Bodø">Bodø</a>
+      </p>
       <p class="live"><span class="pulse"></span><span id="live-text">Kobler til AIS…</span></p>
     </section>
 
@@ -96,6 +102,11 @@
   </footer>
 
   <script>
+    document.getElementById("home-search").addEventListener("submit", (evt) => {
+      evt.preventDefault();
+      const q = document.getElementById("home-q").value.trim();
+      location.href = q ? `/app#sok=${encodeURIComponent(q)}` : "/app#sok";
+    });
     fetch("/api/ais/status").then((r) => r.json()).then((s) => {
       document.getElementById("live-text").textContent = s.tilkoblet
         ? `${s.fartoy.toLocaleString("no-NO")} fartøy følges akkurat nå`

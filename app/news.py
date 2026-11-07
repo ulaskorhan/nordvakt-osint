@@ -314,6 +314,103 @@ def places(hours: int = 72) -> list[dict]:
     return list(by_place.values())
 
 
+# --- Oppslag for entitetsmodellen (connectors/news_conn.py) ---
+# SQLite sin lower() håndterer ikke æøå, så tekstmatching gjøres i Python.
+
+_ARTICLE_COLS = "id, kilde, tittel, lenke, publisert, sammendrag"
+
+
+def _article(row) -> dict:
+    return dict(zip(("id", "kilde", "tittel", "lenke", "publisert", "sammendrag"), row))
+
+
+def get_article(aid: str) -> dict | None:
+    with _lock:
+        row = _db.execute(f"SELECT {_ARTICLE_COLS} FROM artikler WHERE id = ?", (aid,)).fetchone()
+    return _article(row) if row else None
+
+
+def _recent(days: int) -> list[dict]:
+    with _lock:
+        rows = _db.execute(
+            f"SELECT {_ARTICLE_COLS} FROM artikler WHERE publisert > ? ORDER BY publisert DESC",
+            (time.time() - days * 86400,),
+        ).fetchall()
+    return [_article(r) for r in rows]
+
+
+def articles_matching(terms: list[str], limit: int = 25, days: int = 30) -> list[dict]:
+    """Saker der et av ordene forekommer i tittel eller ingress (også som forledd)."""
+    patterns = [re.compile(rf"(?<!\w){re.escape(t.lower())}") for t in terms if len(t) >= 3]
+    if not patterns:
+        return []
+    out = []
+    for a in _recent(days):
+        text = f"{a['tittel']} {a['sammendrag']}".lower()
+        if any(p.search(text) for p in patterns):
+            out.append(a)
+            if len(out) >= limit:
+                break
+    return out
+
+
+def articles_by_entity(tekst: str, limit: int = 25) -> list[dict]:
+    with _lock:
+        rows = _db.execute(
+            f"""SELECT {_ARTICLE_COLS} FROM artikler WHERE id IN
+                (SELECT artikkel_id FROM enheter WHERE tekst = ?) ORDER BY publisert DESC LIMIT ?""",
+            (tekst, limit),
+        ).fetchall()
+    return [_article(r) for r in rows]
+
+
+def entities_of(aid: str) -> list[dict]:
+    with _lock:
+        rows = _db.execute(
+            """SELECT e.tekst, e.type, s.funnet, s.lat, s.lon, s.type, s.kommune FROM enheter e
+               LEFT JOIN steder s ON s.navn = e.tekst AND e.type = 'STED' WHERE e.artikkel_id = ?""",
+            (aid,),
+        ).fetchall()
+    return [dict(zip(("tekst", "type", "funnet", "lat", "lon", "stedstype", "kommune"), r)) for r in rows]
+
+
+def search_articles(q: str, limit: int = 8, days: int = 30) -> list[dict]:
+    ql = q.lower()
+    return [a for a in _recent(days) if ql in a["tittel"].lower()][:limit]
+
+
+def search_org_mentions(q: str, limit: int = 5) -> list[tuple[str, int]]:
+    ql = q.lower()
+    with _lock:
+        rows = _db.execute(
+            "SELECT tekst, COUNT(DISTINCT artikkel_id) AS n FROM enheter WHERE type = 'ORG' GROUP BY tekst ORDER BY n DESC"
+        ).fetchall()
+    return [(t, n) for t, n in rows if ql in t.lower()][:limit]
+
+
+def get_place(name: str) -> dict | None:
+    with _lock:
+        row = _db.execute("SELECT navn, lat, lon, type, kommune FROM steder WHERE navn = ? AND funnet = 1", (name,)).fetchone()
+    return dict(zip(("navn", "lat", "lon", "type", "kommune"), row)) if row else None
+
+
+def search_places(q: str, limit: int = 5) -> list[dict]:
+    ql = q.lower()
+    with _lock:
+        rows = _db.execute("SELECT navn, lat, lon, type, kommune FROM steder WHERE funnet = 1").fetchall()
+    hits = [dict(zip(("navn", "lat", "lon", "type", "kommune"), r)) for r in rows if r[0].lower().startswith(ql)]
+    return sorted(hits, key=lambda p: (p["navn"].lower() != ql, len(p["navn"])))[:limit]
+
+
+async def resolve_place(name: str) -> dict | None:
+    """Slår opp et stedsnavn i Kartverket hvis vi ikke har sett det før."""
+    with _lock:
+        known = _db.execute("SELECT 1 FROM steder WHERE navn = ?", (name,)).fetchone()
+    if not known:
+        await _geocode(name)
+    return get_place(name)
+
+
 def status() -> dict:
     with _lock:
         total = _db.execute("SELECT COUNT(*) FROM artikler").fetchone()[0]

@@ -2,7 +2,24 @@
 
 OSINT-plattform for Norge, bygget på åpne offentlige data.
 
-## Moduler
+## Arkitektur: entiteter, connectors og visninger
+
+Alt er en **entitet** med en id på formen `<prefiks>:<nøkkel>`:
+
+| Type | Id-eksempel | Kilde |
+|---|---|---|
+| Organisasjon | `org:983452841`, `orgnavn:Gassco` | Enhetsregisteret, nyheter |
+| Fartøy | `vessel:257130600` | Kystverket AIS |
+| Overvåkingssone | `zone:karsto` | `data/zones.json` |
+| Sted | `place:Bodø` | Kartverket stedsnavn |
+| Nyhetssak | `article:<hash>` | RSS |
+| Person (bare som rolle) | `person:<hash>` | Enhetsregisteret |
+
+Hver datakilde er en **connector** i `app/connectors/`. En connector kan søke, slå opp entiteter den eier, og utvide *hvilken som helst* entitet med det kilden vet om den. AIS-connectoren finner for eksempel fartøy nær et sted fra nyhetene, og nyhets-connectoren finner saker som nevner et selskap fra registeret. En ny kilde er én ny fil som arver fra `Connector` i `base.py` og legges til i `CONNECTORS` i `app/core.py`.
+
+**Søk**-fanen (`/api/search`, `/api/entity`) går mot alle connectors samtidig. Entitetssiden viser alt som er funnet på kart, i graf og på tidslinje. Alle entiteter og relasjoner som slås opp, lagres i `data/entiteter.sqlite`, unntatt personer.
+
+## Forhåndsdefinerte visninger
 
 **Maritim.** Henter sanntids AIS fra Kystverkets åpne strøm (`153.44.253.27:5631`, NLOD) og viser fartøy på kart med flaggstat utledet fra MMSI. Appen varsler når:
 - `flagg_i_sone`: et fartøy med flagg på overvåkingslisten (`WATCH_FLAGS` i `app/ais.py`) går inn i en sone
@@ -35,6 +52,8 @@ Plattformen handler om virksomheter, infrastruktur og fartøy, ikke om å kartle
 
 ## Mulige neste steg
 
+- Saksmapper: lagre entiteter og notater i en etterforskning og eksportere med kildehenvisninger
+- Generelle varselregler på tvers av kilder
 - Sanksjonsscreening av selskaper og fartøy (OpenSanctions)
 - Lagre AIS-historikk (PostGIS) for å oppdage AIS-brudd («dark activity») og møter mellom fartøy
 - Koble fartøy til rederi og eier

@@ -7,23 +7,44 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import ais, brreg, news, provenance
+from . import brreg, core, news, provenance
+from . import store as entity_store
 
 logging.basicConfig(level=logging.INFO)
 STATIC = Path(__file__).resolve().parent.parent / "static"
 
-store = ais.AISStore(ais.load_zones())
+store = core.ais_connector.store
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    tasks = [asyncio.create_task(ais.run(store)), asyncio.create_task(news.run())]
+    tasks = [asyncio.create_task(c.run()) for c in core.CONNECTORS]
     yield
     for task in tasks:
         task.cancel()
 
 
 app = FastAPI(title="Nordvakt", lifespan=lifespan)
+
+
+# --- Samlet søk og entiteter ---
+
+@app.get("/api/search")
+async def search(q: str):
+    return await core.search(q)
+
+
+@app.get("/api/entity")
+async def entity(id: str):
+    result = await core.entity(id)
+    if result is None:
+        raise HTTPException(404, "Fant ikke entiteten")
+    return result
+
+
+@app.get("/api/store/stats")
+def store_stats():
+    return entity_store.stats()
 
 
 # --- Maritim ---

@@ -42,7 +42,27 @@ def _summary(e: dict) -> dict:
         "slettet": bool(e.get("slettedato")),
         "overordnet": e.get("overordnetEnhet"),
         "hjemmeside": e.get("hjemmeside"),
+        "gate": (addr.get("adresse") or [None])[0],
+        "postnummer": addr.get("postnummer"),
     }
+
+
+async def geocode_address(gate: str | None, postnummer: str | None) -> tuple[float, float] | None:
+    """Koordinater for en forretningsadresse via Kartverkets adresse-API."""
+    if not gate or not postnummer:
+        return None
+    url = "https://ws.geonorge.no/adresser/v1/sok"
+    params = {"sok": gate, "postnummer": postnummer, "treffPerSide": 1, "utkoordsys": 4258}
+    try:
+        resp = await _client.get(url, params=params)
+        provenance.log("Kartverket adresser", str(resp.url), resp.status_code, resp.content)
+        hits = resp.json().get("adresser", []) if resp.status_code == 200 else []
+    except Exception:
+        return None
+    if not hits:
+        return None
+    p = hits[0]["representasjonspunkt"]
+    return p["lat"], p["lon"]
 
 
 async def search(q: str) -> list[dict]:

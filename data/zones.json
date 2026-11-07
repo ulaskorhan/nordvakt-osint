@@ -1,14 +1,20 @@
 {
-  "_merknad": "Omtrentlige koordinater hentet fra åpne kart. Rediger fritt: radius_km styrer hvor stor sonen er.",
+  "_merknad": "Omtrentlige koordinater hentet fra åpne kart. Rediger fritt: radius_km styrer hvor stor sonen er, alias brukes til å finne sonen i søk og nyheter, operatør kobler sonen til Enhetsregisteret.",
   "soner": [
-    {"id": "kollsnes", "navn": "Kollsnes gassprosessanlegg", "kategori": "energi", "lat": 60.551, "lon": 4.835, "radius_km": 5},
-    {"id": "mongstad", "navn": "Mongstad raffineri og terminal", "kategori": "energi", "lat": 60.808, "lon": 5.032, "radius_km": 5},
-    {"id": "karsto", "navn": "Kårstø gassprosessanlegg", "kategori": "energi", "lat": 59.272, "lon": 5.517, "radius_km": 5},
-    {"id": "nyhamna", "navn": "Nyhamna gassanlegg", "kategori": "energi", "lat": 62.849, "lon": 6.950, "radius_km": 5},
-    {"id": "tjeldbergodden", "navn": "Tjeldbergodden", "kategori": "energi", "lat": 63.405, "lon": 8.693, "radius_km": 4},
-    {"id": "melkoya", "navn": "Melkøya (Hammerfest LNG)", "kategori": "energi", "lat": 70.687, "lon": 23.597, "radius_km": 5},
-    {"id": "haakonsvern", "navn": "Haakonsvern orlogsstasjon", "kategori": "forsvar", "lat": 60.333, "lon": 5.233, "radius_km": 4},
-    {"id": "ramsund", "navn": "Ramsund orlogsstasjon", "kategori": "forsvar", "lat": 68.480, "lon": 16.530, "radius_km": 4},
-    {"id": "olavsvern", "navn": "Olavsvern (Ramfjorden)", "kategori": "forsvar", "lat": 69.535, "lon": 19.006, "radius_km": 4}
+    {"id": "kollsnes", "navn": "Kollsnes gassprosessanlegg", "alias": ["Kollsnes"], "kategori": "energi", "lat": 60.551, "lon": 4.835, "radius_km": 5,
+     "operatør": {"orgnr": "983452841", "navn": "GASSCO AS"}},
+    {"id": "mongstad", "navn": "Mongstad raffineri og terminal", "alias": ["Mongstad"], "kategori": "energi", "lat": 60.808, "lon": 5.032, "radius_km": 5,
+     "operatør": {"orgnr": "923609016", "navn": "EQUINOR ASA"}},
+    {"id": "karsto", "navn": "Kårstø gassprosessanlegg", "alias": ["Kårstø"], "kategori": "energi", "lat": 59.272, "lon": 5.517, "radius_km": 5,
+     "operatør": {"orgnr": "983452841", "navn": "GASSCO AS"}},
+    {"id": "nyhamna", "navn": "Nyhamna gassanlegg", "alias": ["Nyhamna"], "kategori": "energi", "lat": 62.849, "lon": 6.950, "radius_km": 5,
+     "operatør": {"orgnr": "983452841", "navn": "GASSCO AS"}},
+    {"id": "tjeldbergodden", "navn": "Tjeldbergodden", "alias": ["Tjeldbergodden"], "kategori": "energi", "lat": 63.405, "lon": 8.693, "radius_km": 4,
+     "operatør": {"orgnr": "923609016", "navn": "EQUINOR ASA"}},
+    {"id": "melkoya", "navn": "Melkøya (Hammerfest LNG)", "alias": ["Melkøya", "Hammerfest LNG"], "kategori": "energi", "lat": 70.687, "lon": 23.597, "radius_km": 5,
+     "operatør": {"orgnr": "923609016", "navn": "EQUINOR ASA"}},
+    {"id": "haakonsvern", "navn": "Haakonsvern orlogsstasjon", "alias": ["Haakonsvern"], "kategori": "forsvar", "lat": 60.333, "lon": 5.233, "radius_km": 4},
+    {"id": "ramsund", "navn": "Ramsund orlogsstasjon", "alias": ["Ramsund"], "kategori": "forsvar", "lat": 68.480, "lon": 16.530, "radius_km": 4},
+    {"id": "olavsvern", "navn": "Olavsvern (Ramfjorden)", "alias": ["Olavsvern"], "kategori": "forsvar", "lat": 69.535, "lon": 19.006, "radius_km": 4}
   ]
 }

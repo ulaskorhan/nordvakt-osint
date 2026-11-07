@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nordvakt</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
-  <link rel="stylesheet" href="/static/style.css?v=6">
+  <link rel="stylesheet" href="/static/style.css?v=8">
 </head>
 <body>
   <header>
     <a class="brand" href="/">NORDVAKT <span>OSINT · Norge</span></a>
     <nav>
-      <button class="tab active" data-view="maritim">Maritim</button>
+      <button class="tab active" data-view="sok">Søk</button>
+      <button class="tab" data-view="maritim">Maritim</button>
       <button class="tab" data-view="nyheter">Nyheter</button>
       <button class="tab" data-view="nettverk">Selskapsnettverk</button>
       <button class="tab" data-view="kildelogg">Kildelogg</button>
@@ -20,7 +21,48 @@
   </header>
 
   <main>
-    <section id="view-maritim" class="view active">
+    <section id="view-sok" class="view active">
+      <div class="sok-main">
+        <form id="global-search" class="global-search">
+          <input id="global-q" type="search" placeholder="Søk etter sted, selskap, fartøy, MMSI eller nyhet" autocomplete="off">
+          <button type="submit">Søk</button>
+        </form>
+
+        <div id="sok-start" class="sok-start">
+          <p class="hint">Ett søk går mot alle kildene samtidig: Kystverket AIS, Enhetsregisteret, Kartverket og nyhetene. Prøv for eksempel:</p>
+          <div class="chips">
+            <a class="chip" href="#sok=Kårstø">Kårstø</a>
+            <a class="chip" href="#sok=Gassco">Gassco</a>
+            <a class="chip" href="#sok=Hammerfest">Hammerfest</a>
+            <a class="chip" href="#sok=Statnett">Statnett</a>
+            <a class="chip" href="#sok=Bodø">Bodø</a>
+            <a class="chip" href="#sok=Mongstad">Mongstad</a>
+          </div>
+        </div>
+
+        <div id="sok-results"></div>
+
+        <div id="entity-page" hidden>
+          <div id="entity-head" class="entity-head"></div>
+          <div class="entity-grid">
+            <div class="entity-pane"><div id="entity-map"></div><div id="entity-map-empty" class="pane-empty" hidden>Ingen posisjon for denne entiteten eller det som er relatert.</div></div>
+            <div class="entity-pane"><div id="entity-graph"></div></div>
+          </div>
+          <div class="entity-lower">
+            <div>
+              <h3>Tidslinje</h3>
+              <ul id="entity-timeline" class="timeline"></ul>
+            </div>
+            <div>
+              <h3>Relatert</h3>
+              <div id="entity-related"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-maritim" class="view">
       <div id="map"></div>
       <aside class="panel">
         <div class="block">
@@ -108,6 +150,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
-  <script src="/static/app.js?v=4"></script>
+  <script src="/static/app.js?v=7"></script>
 </body>
 </html>

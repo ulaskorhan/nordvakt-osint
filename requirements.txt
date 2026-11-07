@@ -2,3 +2,5 @@ fastapi
 uvicorn
 httpx
 pyais
+feedparser
+spacy

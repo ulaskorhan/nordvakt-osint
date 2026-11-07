@@ -16,6 +16,11 @@ function showView(view) {
   if (view === "maritim") map.invalidateSize();
   if (view === "nettverk") cy.resize();
   if (view === "kildelogg") loadLog();
+  if (view === "nyheter") loadNews();
+}
+function goTo(view) {
+  history.replaceState(null, "", `#${view}`);
+  showView(view);
 }
 document.querySelectorAll(".tab").forEach((btn) => btn.addEventListener("click", () => {
   history.replaceState(null, "", `#${btn.dataset.view}`);
@@ -39,7 +44,7 @@ const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
 });
 const zoneLayer = L.layerGroup().addTo(map);
 const vesselLayer = L.layerGroup().addTo(map);
-L.control.layers({ "Kartverket gråtone": kartverket, OpenStreetMap: osm }, { Fartøy: vesselLayer, Soner: zoneLayer }).addTo(map);
+const layerControl = L.control.layers({ "Kartverket gråtone": kartverket, OpenStreetMap: osm }, { Fartøy: vesselLayer, Soner: zoneLayer }).addTo(map);
 
 const markers = new Map();
 let vessels = [];
@@ -323,6 +328,127 @@ document.getElementById("load-all").addEventListener("click", async () => {
 });
 
 cy.on("add remove", () => { document.getElementById("graph-empty").hidden = cy.elements().nonempty(); });
+
+// ---------- Nyheter ----------
+const newsLayer = L.layerGroup();
+layerControl.addOverlay(newsLayer, "Nyheter (steder)");
+const placeMarkers = new Map();
+const newsFilter = { enhet: null, type: null };
+const safeUrl = (u) => (/^https?:\/\//i.test(u || "") ? u : "#");
+const timeAgo = (epoch) => {
+  const m = Math.max(0, Math.round((Date.now() / 1000 - epoch) / 60));
+  if (m < 60) return `${m} min siden`;
+  const h = Math.round(m / 60);
+  return h < 48 ? `${h} t siden` : `${Math.round(h / 24)} d siden`;
+};
+const CHIP_CLASS = { ORG: "org", STED: "sted", HENDELSE: "hendelse" };
+const entityChip = (e, count) =>
+  `<button class="chip ${CHIP_CLASS[e.type]}" data-enhet="${esc(e.tekst)}" data-type="${esc(e.type)}">${esc(e.tekst)}${count ? `<small>${count}</small>` : ""}</button>`;
+
+function newsParams() {
+  const p = new URLSearchParams({ timer: document.getElementById("news-hours").value });
+  const q = document.getElementById("news-q").value.trim();
+  if (q) p.set("q", q);
+  if (newsFilter.enhet) p.set("enhet", newsFilter.enhet);
+  if (document.getElementById("news-hits").checked) p.set("kun_treff", "true");
+  return p;
+}
+
+function renderFilterbar() {
+  const bar = document.getElementById("news-filterbar");
+  if (!newsFilter.enhet) { bar.hidden = true; return; }
+  const actions = [];
+  if (newsFilter.type === "ORG") actions.push('<button data-act="nettverk">Søk i selskapsnettverk</button>');
+  if (newsFilter.type === "STED" && placeMarkers.has(newsFilter.enhet)) actions.push('<button data-act="kart">Vis på kart</button>');
+  actions.push('<button data-act="fjern" class="secondary" style="margin:0">Fjern filter</button>');
+  bar.innerHTML = `<span>Saker som nevner <b>${esc(newsFilter.enhet)}</b></span>${actions.join("")}`;
+  bar.hidden = false;
+}
+
+async function loadNews() {
+  const hours = document.getElementById("news-hours").value;
+  try {
+    const [articles, top, status] = await Promise.all([
+      getJSON(`/api/news?${newsParams()}`),
+      getJSON(`/api/news/entities?timer=${hours}`),
+      getJSON("/api/news/status"),
+    ]);
+    renderFilterbar();
+    document.getElementById("news-list").innerHTML = articles.length ? articles.map((a) => `
+      <li>
+        <div class="meta">${esc(a.kilde)} · ${timeAgo(a.publisert)}</div>
+        <a class="title" href="${esc(safeUrl(a.lenke))}" target="_blank" rel="noopener">${esc(a.tittel)}</a>
+        ${a.sammendrag ? `<p>${esc(a.sammendrag)}</p>` : ""}
+        <div class="chips">
+          ${a.treff.map((t) => `<span class="chip treff">${esc(t)}</span>`).join("")}
+          ${a.enheter.map((e) => entityChip(e)).join("")}
+        </div>
+      </li>`).join("") : `<li class="meta">${status.siste_kjoring ? "Ingen saker matcher filteret." : "Henter nyheter for første gang. Det tar et minutt eller to…"}</li>`;
+    document.getElementById("top-org").innerHTML = top.ORG.map((e) => entityChip({ ...e, type: "ORG" }, e.antall)).join("");
+    document.getElementById("top-sted").innerHTML = top.STED.map((e) => entityChip({ ...e, type: "STED" }, e.antall)).join("");
+    document.getElementById("keywords").innerHTML = status.emneord.map((k) => `<span class="chip static">${esc(k)}</span>`).join("");
+    const errors = Object.keys(status.feil).length;
+    document.getElementById("news-status").textContent =
+      `${status.artikler} saker fra ${status.kilder} kilder · ` +
+      (status.kjorer ? "henter nå…" : status.siste_kjoring ? `sist hentet ${fmtTime(status.siste_kjoring)}` : "venter på første innhenting") +
+      ` · hvert ${status.intervall_min}. min` + (errors ? ` · ${errors} kilde(r) feilet` : "");
+  } catch (e) { console.error(e); }
+}
+
+async function loadPlaces() {
+  try {
+    const places = await getJSON("/api/news/places?timer=72");
+    newsLayer.clearLayers();
+    placeMarkers.clear();
+    for (const p of places) {
+      const m = L.circleMarker([p.lat, p.lon], {
+        radius: 5 + Math.sqrt(p.antall) * 2, color: "#f0c450", weight: 1.5, fillColor: "#f0c450", fillOpacity: 0.25,
+      }).bindPopup(`<div class="news-popup"><b>${esc(p.navn)} · ${p.antall} sak${p.antall === 1 ? "" : "er"}</b>${
+        p.saker.map((s) => `<a href="${esc(safeUrl(s.lenke))}" target="_blank" rel="noopener">${esc(s.tittel)}</a>`).join("")
+      }<span style="color:#8592a3">Omtrentlig plassering (${esc(p.type || "")})</span></div>`);
+      m.addTo(newsLayer);
+      placeMarkers.set(p.navn, m);
+    }
+  } catch (e) { console.error(e); }
+}
+
+function setNewsFilter(enhet, type) {
+  newsFilter.enhet = enhet;
+  newsFilter.type = type;
+  document.querySelector(".news-main").scrollTop = 0;
+  loadNews();
+}
+
+document.getElementById("view-nyheter").addEventListener("click", (evt) => {
+  const c = evt.target.closest(".chip[data-enhet]");
+  if (c) { setNewsFilter(c.dataset.enhet, c.dataset.type); return; }
+  const act = evt.target.closest("button[data-act]")?.dataset.act;
+  if (act === "fjern") setNewsFilter(null, null);
+  if (act === "nettverk") {
+    goTo("nettverk");
+    document.getElementById("org-q").value = newsFilter.enhet;
+    document.getElementById("org-search").requestSubmit();
+  }
+  if (act === "kart") {
+    const m = placeMarkers.get(newsFilter.enhet);
+    goTo("maritim");
+    map.addLayer(newsLayer);
+    map.flyTo(m.getLatLng(), 9);
+    map.once("moveend", () => m.openPopup());
+  }
+});
+
+let newsDebounce;
+document.getElementById("news-q").addEventListener("input", () => {
+  clearTimeout(newsDebounce);
+  newsDebounce = setTimeout(loadNews, 300);
+});
+document.getElementById("news-hits").addEventListener("change", loadNews);
+document.getElementById("news-hours").addEventListener("change", loadNews);
+
+loadPlaces();
+setInterval(loadPlaces, 120000);
+setInterval(() => { if (document.getElementById("view-nyheter").classList.contains("active")) loadNews(); }, 60000);
 
 if (location.hash) showView(location.hash.slice(1));
 

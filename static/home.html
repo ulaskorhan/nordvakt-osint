@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nordvakt</title>
   <meta name="description" content="Et enkelt verktøy som viser hvordan åpne kilder kan brukes til OSINT i Norge.">
-  <link rel="stylesheet" href="/static/home.css">
+  <link rel="stylesheet" href="/static/home.css?v=2">
 </head>
 <body>
   <header class="top">
@@ -34,6 +34,11 @@
         <p>Skip langs norskekysten i sanntid, med flaggstat og varsler når fartøy oppholder seg nær kritisk infrastruktur.</p>
         <span class="more">Åpne kartet →</span>
       </a>
+      <a class="card" href="/app#nyheter">
+        <h2>Nyheter</h2>
+        <p>Nyheter fra norske medier og myndigheter, der språkmodellen finner organisasjoner og steder og plasserer sakene på kartet.</p>
+        <span class="more">Les siste saker →</span>
+      </a>
       <a class="card" href="/app#nettverk">
         <h2>Selskapsnettverk</h2>
         <p>Søk opp et selskap og se hvem som sitter i styret, hvem som er revisor og hvordan selskaper henger sammen.</p>
@@ -53,7 +58,11 @@
           <span class="freq">Hentes direkte ved hvert søk</span>
         </li>
         <li>
-          <div><a href="https://www.kartverket.no/" target="_blank" rel="noopener">Kartverket</a><small>Bakgrunnskart</small></div>
+          <div>NRK, E24, VG, Teknisk Ukeblad og regjeringen.no<small>Titler og ingresser fra RSS</small></div>
+          <span class="freq">Hvert 15. minutt</span>
+        </li>
+        <li>
+          <div><a href="https://www.kartverket.no/" target="_blank" rel="noopener">Kartverket</a><small>Bakgrunnskart og stedsnavnregisteret</small></div>
           <span class="freq">Løpende fra Kartverket</span>
         </li>
         <li>
@@ -67,7 +76,7 @@
     <section>
       <h2 class="section-title">Verktøy</h2>
       <ul class="chips">
-        <li>Python</li><li>FastAPI</li><li>pyais</li><li>httpx</li><li>SQLite</li><li>Leaflet</li><li>Cytoscape.js</li>
+        <li>Python</li><li>FastAPI</li><li>spaCy (norsk språkmodell)</li><li>pyais</li><li>feedparser</li><li>httpx</li><li>SQLite</li><li>Leaflet</li><li>Cytoscape.js</li>
       </ul>
     </section>
 
@@ -76,7 +85,7 @@
       <div class="principles">
         <div><h3>Bare åpne kilder</h3><p>Ingen innlogging, ingen lekkede data. Alt kan etterprøves av hvem som helst.</p></div>
         <div><h3>Sporbarhet</h3><p>Hvert oppslag logges med tidspunkt, adresse og en fingeravtrykk (SHA-256) av svaret.</p></div>
-        <div><h3>Personvern</h3><p>Fokus på virksomheter og infrastruktur, ikke privatpersoner. Bare fødselsår vises.</p></div>
+        <div><h3>Personvern</h3><p>Fokus på virksomheter og infrastruktur, ikke privatpersoner. Personnavn i nyheter lagres ikke.</p></div>
       </div>
     </section>
   </main>

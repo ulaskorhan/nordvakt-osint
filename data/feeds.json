@@ -1,0 +1,21 @@
+{
+  "_merknad": "RSS-kilder og emneord for nyhetsovervåkingen. Emneord matcher også sammensatte ord, f.eks. 'drone' treffer 'droneobservasjoner'.",
+  "intervall_min": 15,
+  "kilder": [
+    {"navn": "NRK toppsaker", "url": "https://www.nrk.no/toppsaker.rss"},
+    {"navn": "NRK siste", "url": "https://www.nrk.no/nyheter/siste.rss"},
+    {"navn": "NRK Vestland", "url": "https://www.nrk.no/vestland/siste.rss"},
+    {"navn": "NRK Rogaland", "url": "https://www.nrk.no/rogaland/siste.rss"},
+    {"navn": "NRK Nordland", "url": "https://www.nrk.no/nordland/siste.rss"},
+    {"navn": "NRK Troms og Finnmark", "url": "https://www.nrk.no/tromsogfinnmark/siste.rss"},
+    {"navn": "E24", "url": "https://e24.no/rss2/"},
+    {"navn": "VG", "url": "https://www.vg.no/rss/feed/"},
+    {"navn": "Regjeringen", "url": "https://www.regjeringen.no/no/rss/Rss/2581966/?documentType=aktuelt/nyheter"},
+    {"navn": "Teknisk Ukeblad", "url": "https://www.tu.no/rss"}
+  ],
+  "emneord": [
+    "sabotasje", "drone", "spionasje", "etterretning", "PST", "sanksjon",
+    "cyberangrep", "dataangrep", "hacker", "kritisk infrastruktur",
+    "undersjøisk", "sjøkabel", "rørledning", "skyggeflåte", "beredskap"
+  ]
+}

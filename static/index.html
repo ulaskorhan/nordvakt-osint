@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nordvakt</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
-  <link rel="stylesheet" href="/static/style.css?v=5">
+  <link rel="stylesheet" href="/static/style.css?v=6">
 </head>
 <body>
   <header>
     <a class="brand" href="/">NORDVAKT <span>OSINT · Norge</span></a>
     <nav>
       <button class="tab active" data-view="maritim">Maritim</button>
+      <button class="tab" data-view="nyheter">Nyheter</button>
       <button class="tab" data-view="nettverk">Selskapsnettverk</button>
       <button class="tab" data-view="kildelogg">Kildelogg</button>
     </nav>
@@ -32,6 +33,36 @@
           <h3>Varsler <small id="alert-count"></small></h3>
           <p class="hint">Varsler er indikatorer, ikke funn. De må vurderes manuelt.</p>
           <ul id="alerts" class="list"></ul>
+        </div>
+      </aside>
+    </section>
+
+    <section id="view-nyheter" class="view">
+      <div class="news-main">
+        <div id="news-filterbar" class="filterbar" hidden></div>
+        <ul id="news-list" class="news-list"></ul>
+      </div>
+      <aside class="panel">
+        <div class="block">
+          <input id="news-q" type="search" placeholder="Søk i titler og ingresser">
+          <div class="row">
+            <label class="check"><input id="news-hits" type="checkbox"> Bare emneord-treff</label>
+            <select id="news-hours">
+              <option value="24">24 timer</option>
+              <option value="72" selected>3 døgn</option>
+              <option value="168">7 døgn</option>
+            </select>
+          </div>
+          <p id="news-status" class="hint" style="margin:8px 0 0"></p>
+        </div>
+        <div class="block grow">
+          <h3>Mest omtalte organisasjoner</h3>
+          <div id="top-org" class="chips"></div>
+          <h3 style="margin-top:14px">Mest omtalte steder</h3>
+          <div id="top-sted" class="chips"></div>
+          <h3 style="margin-top:14px">Emneord</h3>
+          <div id="keywords" class="chips"></div>
+          <p class="hint" style="margin-top:14px">Personnavn gjenkjennes, men lagres ikke. Bare organisasjoner, steder og hendelser hentes ut.</p>
         </div>
       </aside>
     </section>
@@ -77,6 +108,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
-  <script src="/static/app.js?v=3"></script>
+  <script src="/static/app.js?v=4"></script>
 </body>
 </html>

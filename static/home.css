@@ -44,7 +44,7 @@ h1 { font-size: clamp(36px, 6vw, 56px); line-height: 1.08; letter-spacing: -0.02
 .pulse { width: 8px; height: 8px; border-radius: 50%; background: #57c785; box-shadow: 0 0 0 0 rgba(87, 199, 133, 0.6); animation: pulse 2s infinite; }
 @keyframes pulse { 70% { box-shadow: 0 0 0 8px rgba(87, 199, 133, 0); } 100% { box-shadow: 0 0 0 0 rgba(87, 199, 133, 0); } }
 
-.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .card {
   display: block; padding: 28px; border-radius: 12px; border: 1px solid var(--border);
   background: var(--surface); text-decoration: none; transition: border-color 0.15s, transform 0.15s;

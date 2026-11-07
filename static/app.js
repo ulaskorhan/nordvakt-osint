@@ -185,29 +185,44 @@ const ROLE_GROUPS = [
 ];
 const roleGroup = (roles) => Math.min(...roles.map((r) => ROLE_GROUPS.findIndex((g) => g.match.test(r))));
 
+// Felles kortstil for begge grafene (Selskapsnettverk og entitetssiden i Søk).
+// Nodene trenger data: text (to linjer), w, h og farge.
+const CARD_STYLE = [
+  { selector: "node", style: {
+    shape: "round-rectangle", width: "data(w)", height: "data(h)", label: "data(text)",
+    "text-wrap": "wrap", "text-max-width": 300, "text-valign": "center", "text-halign": "center",
+    "font-size": 10, "line-height": 1.35, color: "#d8dee6",
+    "background-color": "#151b23", "border-width": 1, "border-color": "data(farge)",
+  } },
+  { selector: "edge", style: {
+    width: 1, "line-color": "#2f3843", "curve-style": "taxi", "taxi-direction": "horizontal", "taxi-turn": "50%",
+  } },
+  { selector: "edge.hl", style: {
+    "line-color": "#8592a3", width: 1.5, label: "data(label)", "font-size": 9, color: "#d8dee6",
+    "text-background-color": "#0d1117", "text-background-opacity": 1, "text-background-padding": 2,
+  } },
+  { selector: ".faded", style: { opacity: 0.15 } },
+];
+
+function highlightOnHover(graph) {
+  graph.on("mouseover", "node", (evt) => {
+    const hood = evt.target.closedNeighborhood();
+    graph.elements().not(hood).addClass("faded");
+    hood.edges().addClass("hl");
+  });
+  graph.on("mouseout", "node", () => graph.elements().removeClass("faded hl"));
+}
+
 const cy = cytoscape({
   container: document.getElementById("graph"),
   style: [
-    { selector: "node", style: {
-      shape: "round-rectangle", width: "data(w)", height: "data(h)", label: "data(text)",
-      "text-wrap": "wrap", "text-max-width": 300, "text-valign": "center", "text-halign": "center",
-      "font-size": 10, "line-height": 1.35, color: "#d8dee6",
-      "background-color": "#151b23", "border-width": 1, "border-color": "data(farge)",
-    } },
+    ...CARD_STYLE,
     { selector: 'node[kind="hoved"]', style: {
       "background-color": "#173e4d", "border-color": "#4fb3d9", "border-width": 2, "font-size": 11, "font-weight": "bold",
     } },
     { selector: 'node[kind="uutvidet"]', style: { "border-style": "dashed", "border-color": "#4fb3d9", color: "#8592a3" } },
     { selector: "node[?delt]", style: { "border-width": 3, "background-color": "#262010" } },
-    { selector: "edge", style: {
-      width: 1, "line-color": "#2f3843", "curve-style": "taxi", "taxi-direction": "horizontal", "taxi-turn": "50%",
-    } },
     { selector: "edge.felles", style: { "curve-style": "bezier", "line-color": "#5a4a2d", "line-style": "dashed" } },
-    { selector: "edge.hl", style: {
-      "line-color": "#8592a3", width: 1.5, label: "data(label)", "font-size": 9, color: "#d8dee6",
-      "text-background-color": "#0d1117", "text-background-opacity": 1, "text-background-padding": 2,
-    } },
-    { selector: ".faded", style: { opacity: 0.15 } },
     { selector: "node:selected", style: { "border-color": "#ffffff", "border-width": 2 } },
   ],
   layout: { name: "preset" },
@@ -250,6 +265,21 @@ function dagreBlock(nodes, edges) {
     if (g.hasNode(e.source().id()) && g.hasNode(e.target().id())) g.setEdge(e.source().id(), e.target().id());
   });
   dagre.layout(g);
+
+  // dagre bytter om på rekkefølgen for å minimere kryssende linjer. Her går nesten alle
+  // linjene i en kolonne til samme kort, så vi kan sortere hver kolonne etter rang
+  // (ledelse før styre før vara, «+N flere» sist) uten å lage kryss.
+  const order = new Map(nodes.sort((a, b) => a.data("rank") - b.data("rank")).map((n, i) => [n.id(), i]));
+  const columns = new Map();
+  nodes.forEach((n) => {
+    const x = Math.round(g.node(n.id()).x);
+    columns.set(x, [...(columns.get(x) || []), n.id()]);
+  });
+  columns.forEach((ids) => {
+    const slots = ids.map((id) => g.node(id).y).sort((a, b) => a - b);
+    ids.sort((a, b) => order.get(a) - order.get(b)).forEach((id, i) => { g.node(id).y = slots[i]; });
+  });
+
   const pos = {};
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   nodes.forEach((n) => {
@@ -320,12 +350,7 @@ function fitReadable(eles) {
   if (cy.zoom() > 1) { cy.zoom(1); cy.center(eles); }
 }
 
-cy.on("mouseover", "node", (evt) => {
-  const hood = evt.target.closedNeighborhood();
-  cy.elements().not(hood).addClass("faded");
-  hood.edges().addClass("hl");
-});
-cy.on("mouseout", "node", () => cy.elements().removeClass("faded hl"));
+highlightOnHover(cy);
 
 document.getElementById("graph-legend").innerHTML =
   ROLE_GROUPS.map((g) => `<span><i style="border-color:${g.farge}"></i>${g.navn}</span>`).join("")
@@ -734,43 +759,80 @@ function renderEntityMap(r) {
   else if (located.length > 1) entityMap.fitBounds(L.latLngBounds(located.map((x) => [x.lat, x.lon])), { padding: [30, 30], maxZoom: 13 });
 }
 
+// Samme kortvisning som Selskapsnettverk: det som peker på entiteten til venstre,
+// det entiteten peker på til høyre. Maks GRAPH_PER_TYPE kort per type; resten samles
+// i ett «+N flere»-kort (hele listen står under Relatert).
+const GRAPH_PER_TYPE = 10;
+const GRAPH_PER_TYPE_PERSON = 20; // et helt styre er ofte 15 personer, og det er hele poenget
+
 function renderEntityGraph(r) {
   if (!entityCy) {
     entityCy = cytoscape({
       container: document.getElementById("entity-graph"),
       style: [
-        { selector: "node", style: {
-          label: "data(label)", color: "#d8dee6", "font-size": 9, "text-valign": "bottom", "text-margin-y": 3,
-          "text-wrap": "ellipsis", "text-max-width": 110, width: 14, height: 14, "background-color": "data(color)",
-        } },
-        { selector: "node[?center]", style: { width: 26, height: 26, "border-width": 2, "border-color": "#ffffff", "font-size": 11, "font-weight": "bold" } },
-        { selector: "edge", style: {
-          width: 1, "line-color": "#3a4552", "curve-style": "bezier", label: "data(label)", "font-size": 7,
-          color: "#8592a3", "text-rotation": "autorotate", "text-background-color": "#0d1117", "text-background-opacity": 1,
-        } },
-        { selector: "edge[?skjul]", style: { label: "" } },
+        ...CARD_STYLE,
+        { selector: 'node[kind="center"]', style: { "background-color": "#1f2a36", "border-width": 2, "font-size": 11, "font-weight": "bold" } },
+        { selector: 'node[kind="mer"]', style: { "border-style": "dashed", color: "#8592a3" } },
+        { selector: 'node[kind="rolle"]', style: { color: "#b4bfcc" } },
       ],
-      maxZoom: 1.4,
+      minZoom: 0.2,
+      maxZoom: 1.5,
       wheelSensitivity: 0.3,
     });
     entityCy.on("tap", "node", (evt) => {
       const n = evt.target;
-      if (n.data("type") !== "person" && !n.data("center")) location.hash = entityHref(n.id());
+      if (n.data("kind") === "lenke") location.hash = entityHref(n.id());
     });
+    highlightOnHover(entityCy);
   }
   entityCy.elements().remove();
-  const nodes = [r.entity, ...r.relaterte].map((x) => ({
-    data: { id: x.id, label: trunc(x.label, 40), type: x.type, color: TYPES[x.type].farge, center: x.id === r.entity.id },
-  }));
-  const ids = new Set(nodes.map((n) => n.data.id));
-  const rels = r.relasjoner.filter((rel) => ids.has(rel.fra) && ids.has(rel.til));
-  const edges = rels.map((rel, i) => ({ data: { id: `r${i}`, source: rel.fra, target: rel.til, label: rel.label, skjul: rels.length > 25 } }));
-  entityCy.add([...nodes, ...edges]);
+
+  const center = r.entity;
+  const labels = relationLabels(r);
+  const card = (id, kind, title, sub, farge, rank) => ({
+    group: "nodes",
+    data: { id, kind, farge, rank, text: [trunc(title, 34), trunc(sub, 38)].join("\n"), w: kind === "center" ? 240 : 220, h: kind === "center" ? 46 : 38 },
+  });
+
+  const elements = [card(center.id, "center", center.label, TYPES[center.type].entall, TYPES[center.type].farge, -1)];
+  const shown = new Set([center.id]);
+  TYPE_ORDER.forEach((t, rank) => {
+    const xs = r.relaterte.filter((x) => x.type === t);
+    const max = t === "person" ? GRAPH_PER_TYPE_PERSON : GRAPH_PER_TYPE;
+    xs.slice(0, max).forEach((x) => {
+      const rels = [...new Set(labels.get(x.id) || [])];
+      const sub = rels.join(" · ") || TYPES[t].entall;
+      // Roller i Enhetsregisteret sorteres som i Selskapsnettverk: ledelse, styre, vara, revisor
+      const role = rels.length ? roleGroup(rels) : -1;
+      const sortRank = role >= 0 && role < ROLE_GROUPS.length - 1 ? 10 + role : rank;
+      // Personer kan ikke åpnes, de vises bare som roller
+      elements.push(card(x.id, t === "person" ? "rolle" : "lenke", x.label, sub, TYPES[t].farge, sortRank));
+      shown.add(x.id);
+    });
+    const rest = xs.slice(max);
+    if (rest.length) {
+      const id = `mer:${t}`;
+      elements.push(card(id, "mer", `+${rest.length} flere`, TYPES[t].flertall.toLowerCase(), TYPES[t].farge, rank + 0.5));
+      // Samme side som resten av typen: de fleste relasjonene avgjør retningen
+      const inbound = r.relasjoner.filter((rel) => rel.til === center.id && rest.some((x) => x.id === rel.fra)).length;
+      const [source, target] = inbound * 2 >= rest.length ? [id, center.id] : [center.id, id];
+      elements.push({ group: "edges", data: { id: `e-${id}`, source, target, label: "" } });
+    }
+  });
+  r.relasjoner.forEach((rel, i) => {
+    if (shown.has(rel.fra) && shown.has(rel.til)) {
+      elements.push({ group: "edges", data: { id: `r${i}`, source: rel.fra, target: rel.til, label: rel.label } });
+    }
+  });
+  entityCy.add(elements);
+
+  const b = dagreBlock(entityCy.nodes(), entityCy.edges());
+  entityCy.nodes().forEach((n) => n.position({ x: b.pos[n.id()].x, y: b.pos[n.id()].y }));
+  // Høyden følger innholdet, slik at kortene kan leses uten å zoome
+  document.getElementById("entity-graph-pane").style.height = `${Math.min(900, Math.max(260, b.h * 0.9 + 60))}px`;
   entityCy.resize();
-  entityCy.layout({
-    name: "concentric", concentric: (n) => (n.data("center") ? 2 : 1), levelWidth: () => 1,
-    minNodeSpacing: 14, animate: false, padding: 24,
-  }).run();
+  entityCy.fit(undefined, 24);
+  if (entityCy.zoom() > 1) { entityCy.zoom(1); entityCy.center(); }
 }
 
 function relationLabels(r) {

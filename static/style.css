@@ -178,8 +178,9 @@ a.chip { text-decoration: none; display: inline-block; }
 .entity-head dl { grid-template-columns: max-content 1fr max-content 1fr; max-width: 900px; }
 .sources { margin-top: 10px; font-size: 12px; color: var(--muted); }
 
-.entity-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
-.entity-pane { position: relative; height: 380px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg); }
+/* Kart og graf i full bredde over hverandre; grafens høyde settes fra innholdet i app.js */
+.entity-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.entity-pane { position: relative; height: 340px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg); }
 #entity-map, #entity-graph { position: absolute; inset: 0; }
 .pane-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; padding: 20px; text-align: center; background: var(--bg); z-index: 500; }
 .pane-empty[hidden] { display: none; }

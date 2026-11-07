@@ -7,14 +7,21 @@ const getJSON = async (url) => {
 };
 const fmtTime = (epoch) => new Date(epoch * 1000).toLocaleTimeString("no-NO");
 
-// ---------- Faner ----------
-document.querySelectorAll(".tab").forEach((btn) => btn.addEventListener("click", () => {
+// ---------- Faner (#maritim, #nettverk, #kildelogg) ----------
+function showView(view) {
+  const btn = document.querySelector(`.tab[data-view="${view}"]`);
+  if (!btn) return;
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b === btn));
-  document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${btn.dataset.view}`));
-  if (btn.dataset.view === "maritim") map.invalidateSize();
-  if (btn.dataset.view === "nettverk") cy.resize();
-  if (btn.dataset.view === "kildelogg") loadLog();
+  document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${view}`));
+  if (view === "maritim") map.invalidateSize();
+  if (view === "nettverk") cy.resize();
+  if (view === "kildelogg") loadLog();
+}
+document.querySelectorAll(".tab").forEach((btn) => btn.addEventListener("click", () => {
+  history.replaceState(null, "", `#${btn.dataset.view}`);
+  showView(btn.dataset.view);
 }));
+window.addEventListener("hashchange", () => showView(location.hash.slice(1)));
 
 // ---------- Maritim ----------
 const CATEGORY_COLORS = {
@@ -291,6 +298,8 @@ document.getElementById("graph-reset").addEventListener("click", () => {
   cy.elements().remove();
   document.getElementById("node-detail").innerHTML = '<p class="hint">Grafen er tømt.</p>';
 });
+
+if (location.hash) showView(location.hash.slice(1));
 
 // ---------- Kildelogg ----------
 async function loadLog() {

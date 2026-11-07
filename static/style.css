@@ -27,7 +27,7 @@ header {
   border-bottom: 1px solid var(--border);
   background: var(--panel);
 }
-.brand { font-weight: 700; letter-spacing: 0.12em; }
+.brand { font-weight: 700; letter-spacing: 0.12em; color: var(--text); text-decoration: none; }
 .brand span { font-weight: 400; letter-spacing: 0; color: var(--muted); margin-left: 6px; }
 nav { display: flex; gap: 4px; }
 .tab {

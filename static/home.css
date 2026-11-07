@@ -1,0 +1,84 @@
+:root {
+  --bg: #0d1117;
+  --surface: #151b23;
+  --border: #242c36;
+  --text: #e6ebf1;
+  --muted: #8592a3;
+  --accent: #4fb3d9;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+
+.top, main, footer { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+
+.top { display: flex; justify-content: space-between; align-items: center; height: 72px; }
+.brand { font-weight: 700; letter-spacing: 0.16em; font-size: 14px; }
+.top-link { color: var(--muted); text-decoration: none; font-size: 14px; }
+.top-link:hover { color: var(--text); }
+
+section { margin-bottom: 88px; }
+
+.hero { padding-top: 72px; }
+.eyebrow { color: var(--accent); font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; margin: 0 0 16px; }
+h1 { font-size: clamp(36px, 6vw, 56px); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 24px; font-weight: 650; }
+.lead { color: var(--muted); font-size: 18px; max-width: 620px; margin: 0 0 36px; }
+
+.cta { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn {
+  display: inline-block; padding: 11px 20px; border-radius: 8px; text-decoration: none;
+  border: 1px solid var(--border); font-size: 15px; transition: border-color 0.15s;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+.btn.primary:hover { background: #fff; }
+
+.live { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; margin-top: 32px; font-variant-numeric: tabular-nums; }
+.pulse { width: 8px; height: 8px; border-radius: 50%; background: #57c785; box-shadow: 0 0 0 0 rgba(87, 199, 133, 0.6); animation: pulse 2s infinite; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 8px rgba(87, 199, 133, 0); } 100% { box-shadow: 0 0 0 0 rgba(87, 199, 133, 0); } }
+
+.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.card {
+  display: block; padding: 28px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--surface); text-decoration: none; transition: border-color 0.15s, transform 0.15s;
+}
+.card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.card h2 { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
+.card p { margin: 0 0 20px; color: var(--muted); font-size: 15px; }
+.more { color: var(--accent); font-size: 14px; }
+
+.section-title { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 500; margin: 0 0 20px; }
+
+.rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.rows li { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 18px 0; border-bottom: 1px solid var(--border); }
+.rows a { text-decoration: none; }
+.rows a:hover { color: var(--accent); }
+.rows small { display: block; color: var(--muted); font-size: 14px; }
+.freq { color: var(--muted); font-size: 14px; text-align: right; white-space: nowrap; }
+.note { color: var(--muted); font-size: 14px; margin-top: 16px; }
+
+.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.chips li { padding: 6px 14px; border: 1px solid var(--border); border-radius: 999px; font-size: 14px; color: var(--muted); }
+
+.principles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+.principles h3 { font-size: 16px; margin: 0 0 6px; font-weight: 600; }
+.principles p { margin: 0; color: var(--muted); font-size: 15px; }
+
+footer { display: flex; justify-content: space-between; padding-top: 32px; padding-bottom: 48px; border-top: 1px solid var(--border); color: var(--muted); font-size: 14px; }
+footer a { text-decoration: none; }
+footer a:hover { color: var(--text); }
+
+@media (max-width: 680px) {
+  .hero { padding-top: 32px; }
+  section { margin-bottom: 64px; }
+  .cards, .principles { grid-template-columns: 1fr; }
+  .rows li { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .freq { text-align: left; white-space: normal; }
+}

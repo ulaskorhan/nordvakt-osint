@@ -73,6 +73,11 @@ def kildelogg(limit: int = 100):
 
 
 @app.get("/")
+def home():
+    return FileResponse(STATIC / "home.html")
+
+
+@app.get("/app")
 def index():
     return FileResponse(STATIC / "index.html")
 

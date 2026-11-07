@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nordvakt</title>
+  <meta name="description" content="Et enkelt verktøy som viser hvordan åpne kilder kan brukes til OSINT i Norge.">
+  <link rel="stylesheet" href="/static/home.css">
+</head>
+<body>
+  <header class="top">
+    <span class="brand">NORDVAKT</span>
+    <a href="/app#maritim" class="top-link">Åpne verktøyet →</a>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">OSINT · Norge</p>
+      <h1>Se hva åpne kilder kan fortelle.</h1>
+      <p class="lead">
+        Nordvakt er et enkelt verktøy som viser hva OSINT er i praksis: innhenting og analyse av informasjon som er fritt tilgjengelig.
+        Målet er å gi både nysgjerrige og viderekomne konkrete ideer om hvordan offentlige norske data kan brukes.
+      </p>
+      <div class="cta">
+        <a class="btn primary" href="/app#maritim">Se skipstrafikken</a>
+        <a class="btn" href="/app#nettverk">Utforsk selskaper</a>
+      </div>
+      <p class="live"><span class="pulse"></span><span id="live-text">Kobler til AIS…</span></p>
+    </section>
+
+    <section class="cards">
+      <a class="card" href="/app#maritim">
+        <h2>Maritim</h2>
+        <p>Skip langs norskekysten i sanntid, med flaggstat og varsler når fartøy oppholder seg nær kritisk infrastruktur.</p>
+        <span class="more">Åpne kartet →</span>
+      </a>
+      <a class="card" href="/app#nettverk">
+        <h2>Selskapsnettverk</h2>
+        <p>Søk opp et selskap og se hvem som sitter i styret, hvem som er revisor og hvordan selskaper henger sammen.</p>
+        <span class="more">Start et søk →</span>
+      </a>
+    </section>
+
+    <section>
+      <h2 class="section-title">Kilder</h2>
+      <ul class="rows">
+        <li>
+          <div><a href="https://www.kystverket.no/navigasjonstjenester/ais/" target="_blank" rel="noopener">Kystverket – AIS</a><small>Posisjon, fart og identitet for skip</small></div>
+          <span class="freq">Sanntid · kartet oppdateres hvert 10. sek.</span>
+        </li>
+        <li>
+          <div><a href="https://data.brreg.no/enhetsregisteret/api/docs/index.html" target="_blank" rel="noopener">Brønnøysundregistrene – Enhetsregisteret</a><small>Selskaper, roller og eierstruktur</small></div>
+          <span class="freq">Hentes direkte ved hvert søk</span>
+        </li>
+        <li>
+          <div><a href="https://www.kartverket.no/" target="_blank" rel="noopener">Kartverket</a><small>Bakgrunnskart</small></div>
+          <span class="freq">Løpende fra Kartverket</span>
+        </li>
+        <li>
+          <div>Egne overvåkingssoner<small>Energianlegg og orlogsstasjoner langs kysten</small></div>
+          <span class="freq">Vedlikeholdes manuelt</span>
+        </li>
+      </ul>
+      <p class="note">Fartøy som ikke har sendt signal på 30 minutter fjernes fra kartet. Alle data er åpne og lisensiert under NLOD.</p>
+    </section>
+
+    <section>
+      <h2 class="section-title">Verktøy</h2>
+      <ul class="chips">
+        <li>Python</li><li>FastAPI</li><li>pyais</li><li>httpx</li><li>SQLite</li><li>Leaflet</li><li>Cytoscape.js</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="section-title">Prinsipper</h2>
+      <div class="principles">
+        <div><h3>Bare åpne kilder</h3><p>Ingen innlogging, ingen lekkede data. Alt kan etterprøves av hvem som helst.</p></div>
+        <div><h3>Sporbarhet</h3><p>Hvert oppslag logges med tidspunkt, adresse og en fingeravtrykk (SHA-256) av svaret.</p></div>
+        <div><h3>Personvern</h3><p>Fokus på virksomheter og infrastruktur, ikke privatpersoner. Bare fødselsår vises.</p></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Nordvakt</span>
+    <a href="https://github.com/ulaskorhan/nordvakt-osint" target="_blank" rel="noopener">Kildekode på GitHub</a>
+  </footer>
+
+  <script>
+    fetch("/api/ais/status").then((r) => r.json()).then((s) => {
+      document.getElementById("live-text").textContent = s.tilkoblet
+        ? `${s.fartoy.toLocaleString("no-NO")} fartøy følges akkurat nå`
+        : "AIS-strømmen er midlertidig frakoblet";
+    }).catch(() => {
+      document.getElementById("live-text").textContent = "AIS-status utilgjengelig";
+    });
+  </script>
+</body>
+</html>

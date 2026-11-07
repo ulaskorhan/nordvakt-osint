@@ -46,8 +46,21 @@ main { flex: 1; min-height: 0; }
 .view { display: none; height: 100%; }
 .view.active { display: flex; }
 
-#map, #graph { flex: 1; min-width: 0; height: 100%; }
-#graph { background: var(--bg); }
+#map, .graph-wrap { flex: 1; min-width: 0; height: 100%; }
+.graph-wrap { position: relative; }
+#graph { position: absolute; inset: 0; background: var(--bg); }
+
+#graph-empty { position: absolute; inset: 0; display: flex; padding: 24px; overflow-y: auto; }
+#graph-empty[hidden] { display: none; }
+.empty-inner { max-width: 640px; width: 100%; margin: auto; }
+.empty-inner h2 { margin: 0 0 6px; font-size: 20px; font-weight: 600; }
+.examples { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 16px 0 4px; }
+.example {
+  text-align: left; background: var(--panel); color: var(--text); border: 1px solid var(--border);
+  padding: 10px 12px; border-radius: 8px;
+}
+.example:hover { border-color: var(--accent); }
+.example small { display: block; color: var(--muted); font-size: 12px; }
 
 .panel {
   width: 360px; flex-shrink: 0; border-left: 1px solid var(--border);
@@ -106,6 +119,10 @@ td.mono { font-family: ui-monospace, Menlo, monospace; overflow-wrap: anywhere; 
 @media (max-width: 800px) {
   header { flex-wrap: wrap; gap: 8px; }
   .view.active { flex-direction: column; }
-  #map, #graph { height: 55%; flex: none; }
+  #map, .graph-wrap { height: 55%; flex: none; }
+  #graph-empty { padding: 16px; }
   .panel { width: 100%; border-left: 0; border-top: 1px solid var(--border); flex: 1; }
+}
+@media (max-width: 420px) {
+  .examples { grid-template-columns: 1fr; }
 }

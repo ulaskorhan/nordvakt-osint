@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nordvakt</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
-  <link rel="stylesheet" href="/static/style.css?v=2">
+  <link rel="stylesheet" href="/static/style.css?v=5">
 </head>
 <body>
   <header>
@@ -37,7 +37,17 @@
     </section>
 
     <section id="view-nettverk" class="view">
-      <div id="graph"></div>
+      <div class="graph-wrap">
+        <div id="graph"></div>
+        <div id="graph-empty">
+          <div class="empty-inner">
+            <h2>Kom i gang med et eksempel</h2>
+            <p class="hint">Ti sentrale norske selskaper innen energi, kraft, finans, telekom og forsvar. Klikk på ett for å se styret, ledelsen og revisoren.</p>
+            <div id="examples" class="examples"></div>
+            <button id="load-all" class="secondary">Vis alle ti og finn felles koblinger</button>
+          </div>
+        </div>
+      </div>
       <aside class="panel">
         <div class="block">
           <form id="org-search">
@@ -67,6 +77,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
-  <script src="/static/app.js?v=2"></script>
+  <script src="/static/app.js?v=3"></script>
 </body>
 </html>

@@ -299,6 +299,31 @@ document.getElementById("graph-reset").addEventListener("click", () => {
   document.getElementById("node-detail").innerHTML = '<p class="hint">Grafen er tømt.</p>';
 });
 
+// Startvisning: vises så lenge grafen er tom
+const EXAMPLES = [
+  { orgnr: "923609016", navn: "Equinor", sektor: "Olje og gass" },
+  { orgnr: "987059699", navn: "Statkraft", sektor: "Vannkraft" },
+  { orgnr: "962986633", navn: "Statnett", sektor: "Strømnett" },
+  { orgnr: "983452841", navn: "Gassco", sektor: "Gassrør til Europa" },
+  { orgnr: "989795848", navn: "Aker BP", sektor: "Olje og gass" },
+  { orgnr: "984851006", navn: "DNB Bank", sektor: "Finans" },
+  { orgnr: "982463718", navn: "Telenor", sektor: "Telekom" },
+  { orgnr: "943753709", navn: "Kongsberg Gruppen", sektor: "Forsvar og teknologi" },
+  { orgnr: "914778271", navn: "Norsk Hydro", sektor: "Aluminium og energi" },
+  { orgnr: "986228608", navn: "Yara International", sektor: "Gjødsel og industri" },
+];
+
+const examplesEl = document.getElementById("examples");
+examplesEl.innerHTML = EXAMPLES.map((e) => `
+  <button class="example" data-orgnr="${e.orgnr}">${esc(e.navn)}<small>${esc(e.sektor)}</small></button>`).join("");
+examplesEl.querySelectorAll(".example").forEach((b) => b.addEventListener("click", () => expandCompany(b.dataset.orgnr)));
+
+document.getElementById("load-all").addEventListener("click", async () => {
+  for (const e of EXAMPLES) await expandCompany(e.orgnr);
+});
+
+cy.on("add remove", () => { document.getElementById("graph-empty").hidden = cy.elements().nonempty(); });
+
 if (location.hash) showView(location.hash.slice(1));
 
 // ---------- Kildelogg ----------

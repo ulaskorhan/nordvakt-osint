@@ -17,6 +17,7 @@ function showView(view) {
   if (view === "nettverk") cy.resize();
   if (view === "kildelogg") loadLog();
   if (view === "nyheter") loadNews();
+  if (view === "oversikt") loadDashboard();
 }
 function goTo(view) {
   history.replaceState(null, "", `#${view}`);
@@ -645,7 +646,12 @@ function route() {
   const h = decodeURIComponent(location.hash.slice(1));
   if (h.startsWith("e=")) { showView("sok"); openEntity(h.slice(2)); }
   else if (h.startsWith("sok=")) { showView("sok"); runSearch(h.slice(4)); }
-  else showView(h || "sok");
+  else if (h.startsWith("flagg=")) {
+    document.getElementById("vessel-filter").value = h.slice(6);
+    showView("maritim");
+    renderVessels();
+  }
+  else showView(h || "oversikt");
 }
 
 function resultRow(e, rel = "") {
@@ -866,7 +872,6 @@ function renderRelated(r) {
     </div>`).join("") : '<p class="hint">Ingen kilder fant noe relatert.</p>';
 }
 
-route();
 
 // ---------- Kildelogg ----------
 async function loadLog() {
@@ -875,3 +880,188 @@ async function loadLog() {
     <tr><td>${esc(r.tidspunkt)}</td><td>${esc(r.kilde)}</td><td>${esc(r.status)}</td>
     <td class="mono">${esc(r.url)}</td><td class="mono">${esc(r.sha256)}</td></tr>`).join("");
 }
+
+// ---------- Oversikt ----------
+// Et øyeblikksbilde på tvers av kildene. Alt er klikkbart og fører videre til
+// entitetssiden, søket eller riktig fane.
+const nf = (n) => n.toLocaleString("no-NO");
+const dashVisible = () => document.getElementById("view-oversikt").classList.contains("active");
+const tip = document.getElementById("dash-tip");
+let dashMap, dashLayer;
+
+function showTip(evt, html) {
+  tip.innerHTML = html;
+  tip.hidden = false;
+  const r = tip.getBoundingClientRect();
+  const x = Math.min(evt.clientX + 14, window.innerWidth - r.width - 8);
+  const y = evt.clientY - r.height - 10 < 8 ? evt.clientY + 16 : evt.clientY - r.height - 10;
+  tip.style.left = `${x}px`; tip.style.top = `${y}px`;
+}
+const hideTip = () => { tip.hidden = true; };
+
+// Tooltip og klikk på alt som har data-tip / data-href
+function wireInteractive(root) {
+  root.querySelectorAll("[data-tip]").forEach((el) => {
+    el.addEventListener("mousemove", (e) => showTip(e, el.dataset.tip));
+    el.addEventListener("mouseleave", hideTip);
+  });
+  root.querySelectorAll("[data-href]").forEach((el) => el.addEventListener("click", () => {
+    hideTip();
+    location.hash = el.dataset.href;
+  }));
+}
+
+function tile(label, value, sub, href, tone = "") {
+  return `<a class="dash-tile ${tone}" href="${href}"><span class="label">${esc(label)}</span>
+    <span class="value">${esc(value)}</span><span class="sub">${sub}</span></a>`;
+}
+
+function renderTiles(d) {
+  const a = d.ais, n = d.nyheter;
+  const delta = n.siste_24 - n.forrige_24;
+  const deltaTxt = n.forrige_24 ? `<b class="${delta >= 0 ? "up" : "down"}">${delta >= 0 ? "↑" : "↓"} ${nf(Math.abs(delta))}</b> mot døgnet før` : "siste 24 timer";
+  const ents = Object.values(d.lager.entiteter).reduce((s, x) => s + x, 0);
+  const high = a.varsler_24["høy"], mid = a.varsler_24.middels;
+  document.getElementById("dash-tiles").innerHTML = [
+    tile("Fartøy nå", nf(a.fartoy), `${nf(a.i_bevegelse)} i bevegelse`, "#maritim"),
+    tile("Utenlandske fartøy", nf(a.utenlandske), `${a.antall_flagg} flaggstater`, "#maritim"),
+    tile("AIS-varsler, 24 t", nf(high + mid), `${high} høy · ${mid} middels`, "#maritim", high ? "alert" : ""),
+    tile("Nyhetssaker, 24 t", nf(n.siste_24), deltaTxt, "#nyheter"),
+    tile("Emneord-treff, 24 t", nf(n.treff_24), "saker som nevner et emneord", "#nyheter", n.treff_24 ? "warn" : ""),
+    tile("Entiteter i lageret", nf(ents), `${nf(d.lager.relasjoner)} relasjoner`, "#sok"),
+  ].join("");
+}
+
+// Liggende stolper, én farge: lengden bærer tallet, fargen betyr ingenting ekstra.
+function bars(el, rows, opts = {}) {
+  if (!rows.length) { el.innerHTML = `<p class="hint">${opts.empty || "Ingen data ennå."}</p>`; return; }
+  const max = Math.max(...rows.map((r) => r.antall), 1);
+  el.innerHTML = rows.map((r) => `
+    <div class="bar-row${r.href ? " link" : ""}" ${r.href ? `data-href="${esc(r.href)}"` : ""} data-tip="${esc(r.tip || `<b>${esc(r.navn)}</b><br>${nf(r.antall)} ${opts.unit || ""}`)}">
+      <span class="bar-label" title="${esc(r.navn)}">${esc(r.navn)}</span>
+      <span class="bar-track"><i style="width:${r.antall ? Math.max(2, (r.antall / max) * 100) : 0}%"></i></span>
+      <span class="bar-value">${nf(r.antall)}</span>
+    </div>`).join("");
+  wireInteractive(el);
+}
+
+const TYPE_NAMES = {
+  last: "Last", tank: "Tank", passasjer: "Passasjer", fiske: "Fiske", tjeneste: "Tjeneste", slep: "Slep",
+  militær: "Militær", hurtigbåt: "Hurtigbåt", fritid: "Fritid", annet: "Annet", ukjent: "Ukjent type",
+};
+
+// Smultring med samme farger som på kartet. Seks største typer, resten slått sammen.
+function donut(el, allRows) {
+  // Fartøy som ikke har sendt statiske data ennå (skjer hvert 6. min), telles for seg
+  const unknown = allRows.find((r) => r.navn === "ukjent")?.antall || 0;
+  const rows = allRows.filter((r) => r.navn !== "ukjent");
+  const total = rows.reduce((s, r) => s + r.antall, 0);
+  const note = unknown ? `<p class="hint donut-note">${nf(unknown)} fartøy har ikke sendt skipstype ennå</p>` : "";
+  if (!total) { el.innerHTML = `<p class="hint">Ingen skipstyper mottatt ennå.</p>${note}`; return; }
+  const top = rows.slice(0, 6).map((r) => ({ ...r, farge: CATEGORY_COLORS[r.navn], tekst: TYPE_NAMES[r.navn] || r.navn }));
+  const rest = rows.slice(6).reduce((s, r) => s + r.antall, 0);
+  if (rest) top.push({ navn: "andre", antall: rest, farge: "#3a434f", tekst: "Andre" });
+  const R = 70, r0 = 48, C = 90;
+  let ang = -Math.PI / 2;
+  const pt = (rad, a) => `${(C + rad * Math.cos(a)).toFixed(2)} ${(C + rad * Math.sin(a)).toFixed(2)}`;
+  const segs = top.map((s) => {
+    const sweep = (s.antall / total) * Math.PI * 2;
+    const gap = Math.min(0.02, sweep / 4);
+    const a0 = ang + gap, a1 = ang + sweep - gap;
+    ang += sweep;
+    const large = a1 - a0 > Math.PI ? 1 : 0;
+    const path = `M ${pt(R, a0)} A ${R} ${R} 0 ${large} 1 ${pt(R, a1)} L ${pt(r0, a1)} A ${r0} ${r0} 0 ${large} 0 ${pt(r0, a0)} Z`;
+    const pct = Math.round((s.antall / total) * 100);
+    return `<path d="${path}" fill="${s.farge}" data-tip="<b>${esc(s.tekst)}</b><br>${nf(s.antall)} fartøy · ${pct} %"></path>`;
+  }).join("");
+  el.innerHTML = `
+    <div class="donut">
+      <svg viewBox="0 0 180 180" role="img" aria-label="Fartøy fordelt på type">${segs}
+        <text x="90" y="88" class="donut-num">${nf(total)}</text><text x="90" y="106" class="donut-lbl">med kjent type</text></svg>
+      <ul class="donut-legend">${top.map((s) => `<li><i style="background:${s.farge}"></i>${esc(s.tekst)}<span>${nf(s.antall)}</span></li>`).join("")}</ul>
+      ${note}
+    </div>`;
+  wireInteractive(el);
+}
+
+// Søyler per time. Etiketter hver 12. time; tooltip viser timen og antallet.
+function newsColumns(el, perHour) {
+  const max = Math.max(...perHour, 1);
+  const now = new Date();
+  now.setMinutes(0, 0, 0);
+  const hourOf = (i) => new Date(now.getTime() - (71 - i) * 3600e3);
+  const fmt = (d) => d.toLocaleString("no-NO", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  const cols = perHour.map((n, i) => `<div class="col" data-tip="<b>${esc(fmt(hourOf(i)))}</b><br>${n} ${n === 1 ? "sak" : "saker"}"><i style="height:${n ? Math.max(3, (n / max) * 100) : 0}%"></i></div>`).join("");
+  const ticks = [0, 12, 24, 36, 48, 60, 71].map((i) => `<span style="left:${((i + 0.5) / 72) * 100}%">${esc(fmt(hourOf(i)))}</span>`).join("");
+  el.innerHTML = `
+    <div class="cols-wrap">
+      <div class="cols-y"><span>${max}</span><span>${Math.round(max / 2)}</span><span>0</span></div>
+      <div class="cols-plot"><div class="cols-grid"><i></i><i></i><i></i></div><div class="cols">${cols}</div><div class="cols-x">${ticks}</div></div>
+    </div>`;
+  wireInteractive(el);
+}
+
+function renderDashMap(a) {
+  if (!dashMap) {
+    dashMap = L.map("dash-map", { preferCanvas: true, zoomControl: false, attributionControl: true }).setView([65, 13], 4);
+    L.tileLayer("https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/{z}/{y}/{x}.png", {
+      attribution: "© Kartverket", className: "dark-tiles", maxZoom: 18,
+    }).addTo(dashMap);
+    dashLayer = L.layerGroup().addTo(dashMap);
+  }
+  dashMap.invalidateSize();
+  dashLayer.clearLayers();
+  // Norske først, så utenlandske oppå
+  const sorted = [...a.posisjoner].sort((p, q) => p[3] - q[3]);
+  for (const [lat, lon, mmsi, foreign] of sorted) {
+    L.circleMarker([lat, lon], {
+      radius: foreign ? 3 : 2, stroke: false, fillOpacity: foreign ? 0.9 : 0.55,
+      fillColor: foreign ? "#4fb3d9" : "#5b6675",
+    }).on("click", () => { location.hash = `e=vessel:${mmsi}`; }).addTo(dashLayer);
+  }
+  for (const z of zonesCache) {
+    L.circle([z.lat, z.lon], { radius: z.radius_km * 1000, color: "#d4a72c", weight: 1.5, fill: false })
+      .bindTooltip(esc(z.navn)).on("click", () => { location.hash = `e=zone:${z.id}`; }).addTo(dashLayer);
+  }
+}
+
+function listItems(el, items, empty) {
+  el.innerHTML = items.length ? items.join("") : `<li class="hint">${empty}</li>`;
+  wireInteractive(el);
+}
+
+let zonesCache = [];
+async function loadDashboard() {
+  try {
+    if (!zonesCache.length) zonesCache = await getJSON("/api/zones");
+    const d = await getJSON("/api/dashboard");
+    const a = d.ais, n = d.nyheter;
+    renderTiles(d);
+    renderDashMap(a);
+    bars(document.getElementById("dash-flags"),
+      a.flagg.filter((f) => f.navn !== "Norge").slice(0, 11).map((f) => ({ ...f, href: `flagg=${f.navn}` })), { unit: "fartøy" });
+    donut(document.getElementById("dash-types"), a.kategorier);
+    newsColumns(document.getElementById("dash-news"), n.per_time);
+    document.getElementById("dash-news-total").textContent = `${nf(n.per_time.reduce((s, x) => s + x, 0))} saker fra ${n.kilder.length} kilder`;
+    bars(document.getElementById("dash-zones"), a.soner.map((z) => ({
+      navn: z.navn, antall: z.naer, href: `e=zone:${z.id}`,
+      tip: `<b>${esc(z.navn)}</b><br>${z.inne} i sonen, ${z.naer} innen dobbel radius<br>${z.utenlandske} utenlandske`,
+    })), { unit: "fartøy" });
+    bars(document.getElementById("dash-keywords"), n.emneord.slice(0, 10).map((k) => ({ ...k, href: `sok=${k.navn}` })),
+      { unit: "saker", empty: "Ingen saker med emneord siste 7 døgn." });
+    bars(document.getElementById("dash-orgs"), n.topp.ORG.map((o) => ({ navn: o.tekst, antall: o.antall, href: `sok=${o.tekst}` })), { unit: "saker, 72 t" });
+    bars(document.getElementById("dash-places"), n.topp.STED.map((o) => ({ navn: o.tekst, antall: o.antall, href: `sok=${o.tekst}` })), { unit: "saker, 72 t" });
+    listItems(document.getElementById("dash-alerts"), a.siste_varsler.map((v) => `
+      <li data-href="e=vessel:${v.mmsi}"><span class="sev ${v.niva === "høy" ? "high" : "mid"}">${v.niva === "høy" ? "Høy" : "Middels"}</span>
+        <div><b>${esc(v.navn || `MMSI ${v.mmsi}`)}</b> · ${esc(v.flagg)}<br><small>${esc(v.sone)} · ${esc(fmtTime(v.tid))}</small></div></li>`),
+      "Ingen varsler siste døgn.");
+    listItems(document.getElementById("dash-hits"), n.siste_treff.map((t) => `
+      <li><div><a href="${esc(safeUrl(t.lenke))}" target="_blank" rel="noopener">${esc(t.tittel)}</a><br>
+        <small>${esc(t.kilde)} · ${esc(timeAgo(t.publisert))} · ${t.treff.map(esc).join(", ")}</small></div></li>`),
+      "Ingen saker med emneord siste 7 døgn.");
+    document.getElementById("dash-updated").textContent = `Oppdatert ${fmtTime(d.tid)} · oppdateres hvert 30. sekund`;
+  } catch (e) { console.error(e); }
+}
+setInterval(() => { if (dashVisible()) loadDashboard(); }, 30000);
+
+route();

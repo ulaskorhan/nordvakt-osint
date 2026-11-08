@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import brreg, core, news, provenance
+from . import brreg, core, dashboard, news, provenance
 from . import store as entity_store
 
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +25,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Nordvakt", lifespan=lifespan)
+
+
+# --- Oversikt ---
+
+@app.get("/api/dashboard")
+def dashboard_summary():
+    return dashboard.summary(store)
 
 
 # --- Samlet søk og entiteter ---

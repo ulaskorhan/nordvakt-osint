@@ -21,6 +21,8 @@ Hver datakilde er en **connector** i `app/connectors/`. En connector kan søke, 
 
 ## Forhåndsdefinerte visninger
 
+**Oversikt.** Startsiden i appen (`/api/dashboard`). Nøkkeltall, kart over fartøy og soner, flaggstater, fartøystyper, nyhetsvolum per time, emneord, mest omtalte organisasjoner og steder, siste AIS-varsler og saker med emneord. Alt er klikkbart og fører videre til søk, entitetsside eller riktig fane. Oppdateres hvert 30. sekund.
+
 **Maritim.** Henter sanntids AIS fra Kystverkets åpne strøm (`153.44.253.27:5631`, NLOD) og viser fartøy på kart med flaggstat utledet fra MMSI. Appen varsler når:
 - `flagg_i_sone`: et fartøy med flagg på overvåkingslisten (`WATCH_FLAGS` i `app/ais.py`) går inn i en sone
 - `opphold`: et utenlandsk fartøy holder lav fart (< 1,5 kn) i over 20 minutter i en sone

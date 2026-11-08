@@ -416,3 +416,47 @@ def status() -> dict:
         total = _db.execute("SELECT COUNT(*) FROM artikler").fetchone()[0]
     return {**state, "kilder": len(CONFIG["kilder"]), "artikler": total,
             "intervall_min": CONFIG["intervall_min"], "emneord": CONFIG["emneord"]}
+
+
+# Mediehus og byråer nevnes i nesten hver sak («NRK erfarer», «melder NTB») og sier lite.
+MEDIA = {"NRK", "VG", "E24", "TU", "Teknisk Ukeblad", "NTB", "Reuters", "AFP", "AP", "Bloomberg", "Dagbladet", "Aftenposten"}
+
+
+def dashboard() -> dict:
+    """Tall til oversiktssiden: volum, emneord og kilder."""
+    now = time.time()
+    with _lock:
+        rows = _db.execute(
+            "SELECT id, kilde, tittel, lenke, publisert, sammendrag FROM artikler WHERE publisert > ? ORDER BY publisert DESC",
+            (now - 7 * 86400,),
+        ).fetchall()
+    per_time = [0] * 72
+    kilder: dict[str, int] = {}
+    emneord: dict[str, int] = {}
+    siste_treff = []
+    siste_24 = forrige_24 = treff_24 = 0
+    for aid, kilde, tittel, lenke, pub, sammendrag in rows:
+        age_h = (now - pub) / 3600
+        treff = _keyword_hits(f"{tittel} {sammendrag}")
+        for k in treff:
+            emneord[k] = emneord.get(k, 0) + 1
+        if age_h < 72:
+            per_time[71 - int(max(age_h, 0))] += 1
+            kilder[kilde] = kilder.get(kilde, 0) + 1
+        if age_h < 24:
+            siste_24 += 1
+            treff_24 += bool(treff)
+        elif age_h < 48:
+            forrige_24 += 1
+        if treff and len(siste_treff) < 8:
+            siste_treff.append({"id": aid, "kilde": kilde, "tittel": tittel, "lenke": lenke,
+                                "publisert": pub, "treff": treff})
+    return {
+        "siste_24": siste_24, "forrige_24": forrige_24, "treff_24": treff_24,
+        "per_time": per_time,
+        "kilder": sorted(({"navn": k, "antall": n} for k, n in kilder.items()), key=lambda x: -x["antall"]),
+        "emneord": sorted(({"navn": k, "antall": n} for k, n in emneord.items()), key=lambda x: -x["antall"]),
+        "siste_treff": siste_treff,
+        "topp": {t: [e for e in rows if e["tekst"] not in MEDIA][:8]
+                 for t, rows in top_entities(hours=72, limit=14).items()},
+    }

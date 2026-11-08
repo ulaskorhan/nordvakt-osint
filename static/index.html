@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nordvakt</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
-  <link rel="stylesheet" href="/static/style.css?v=12">
+  <link rel="stylesheet" href="/static/style.css?v=14">
 </head>
 <body>
   <header>
     <a class="brand" href="/">NORDVAKT <span>OSINT · Norge</span></a>
     <nav>
-      <button class="tab active" data-view="sok">Søk</button>
+      <button class="tab active" data-view="oversikt">Oversikt</button>
+      <button class="tab" data-view="sok">Søk</button>
       <button class="tab" data-view="maritim">Maritim</button>
       <button class="tab" data-view="nyheter">Nyheter</button>
       <button class="tab" data-view="nettverk">Selskapsnettverk</button>
@@ -21,7 +22,60 @@
   </header>
 
   <main>
-    <section id="view-sok" class="view active">
+    <section id="view-oversikt" class="view active">
+      <div class="dash">
+        <div class="dash-head">
+          <h1>Oversikt</h1>
+          <span id="dash-updated" class="hint"></span>
+        </div>
+        <div id="dash-tiles" class="dash-tiles"></div>
+        <div class="dash-grid">
+          <div class="card span2 tall">
+            <div class="card-head"><h3>Fartøy langs kysten</h3><span class="card-legend"><i style="background:var(--accent)"></i>Utenlandsk <i style="background:#5b6675"></i>Norsk <i class="ring"></i>Sone</span></div>
+            <div id="dash-map" class="card-body"></div>
+          </div>
+          <div class="card tall">
+            <div class="card-head"><h3>Flaggstater utenom Norge</h3></div>
+            <div id="dash-flags" class="card-body bars"></div>
+          </div>
+          <div class="card tall">
+            <div class="card-head"><h3>Fartøystyper</h3></div>
+            <div id="dash-types" class="card-body"></div>
+          </div>
+          <div class="card span2">
+            <div class="card-head"><h3>Nyhetssaker per time, siste 72 timer</h3><span id="dash-news-total" class="hint"></span></div>
+            <div id="dash-news" class="card-body"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Fartøy nær overvåkingssonene</h3></div>
+            <div id="dash-zones" class="card-body bars"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Emneord, siste 7 døgn</h3></div>
+            <div id="dash-keywords" class="card-body bars"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Mest omtalte organisasjoner</h3></div>
+            <div id="dash-orgs" class="card-body bars"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Mest omtalte steder</h3></div>
+            <div id="dash-places" class="card-body bars"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Siste AIS-varsler</h3></div>
+            <ul id="dash-alerts" class="card-body dash-list"></ul>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Siste saker med emneord</h3></div>
+            <ul id="dash-hits" class="card-body dash-list"></ul>
+          </div>
+        </div>
+      </div>
+      <div id="dash-tip" class="dash-tip" hidden></div>
+    </section>
+
+    <section id="view-sok" class="view">
       <div class="sok-main">
         <form id="global-search" class="global-search">
           <input id="global-q" type="search" placeholder="Søk etter sted, selskap, fartøy, MMSI eller nyhet" autocomplete="off">
@@ -153,6 +207,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
-  <script src="/static/app.js?v=15"></script>
+  <script src="/static/app.js?v=17"></script>
 </body>
 </html>

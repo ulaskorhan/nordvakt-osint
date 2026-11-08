@@ -232,6 +232,12 @@ a.chip { text-decoration: none; display: inline-block; }
 .card-head .hint { margin: 0; }
 .card-body { flex: 1; min-height: 0; padding: 4px 14px 12px; overflow-y: auto; }
 #dash-map { padding: 0; margin: 0 1px 1px; border-radius: 0 0 7px 7px; overflow: hidden; background: var(--bg); }
+#dash-map { position: relative; }
+.map-note {
+  position: absolute; z-index: 500; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: 320px;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: rgba(13, 17, 23, 0.92);
+  font-size: 13px; color: var(--text); text-align: center;
+}
 .card-legend { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
 .card-legend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: 6px; }
 .card-legend i.ring { border: 1.5px solid #d4a72c; }

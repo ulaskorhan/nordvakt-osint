@@ -929,19 +929,26 @@ function tile(label, value, sub, href, tone = "") {
     <span class="value">${esc(value)}</span><span class="sub">${sub}</span></${tag}>`;
 }
 
+// Kystverkets AIS-strøm svarer ikke fra GitHub Actions. Da vises det i stedet for nuller.
+const aisMissing = (d) => STATIC && d.øyeblikksbilde && !d.øyeblikksbilde.ais_tilgjengelig;
+const AIS_MISSING = "AIS-strømmen var ikke tilgjengelig da øyeblikksbildet ble laget. Kjør Nordvakt lokalt for sanntidsdata fra Kystverket.";
+
 function renderTiles(d) {
   const a = d.ais, n = d.nyheter;
+  const noAis = aisMissing(d);
   const delta = n.siste_24 - n.forrige_24;
   const deltaTxt = n.forrige_24 ? `<b class="${delta >= 0 ? "up" : "down"}">${delta >= 0 ? "↑" : "↓"} ${nf(Math.abs(delta))}</b> mot døgnet før` : "siste 24 timer";
   const ents = Object.values(d.lager.entiteter).reduce((s, x) => s + x, 0);
   const high = a.varsler_24["høy"], mid = a.varsler_24.middels;
   document.getElementById("dash-tiles").innerHTML = [
-    tile("Fartøy nå", nf(a.fartoy), `${nf(a.i_bevegelse)} i bevegelse`, "#maritim"),
-    tile("Utenlandske fartøy", nf(a.utenlandske), `${a.antall_flagg} flaggstater`, "#maritim"),
-    tile("AIS-varsler, 24 t", nf(high + mid), `${high} høy · ${mid} middels`, "#maritim", high ? "alert" : ""),
+    tile("Fartøy nå", noAis ? "–" : nf(a.fartoy), noAis ? "AIS utilgjengelig" : `${nf(a.i_bevegelse)} i bevegelse`, "#maritim"),
+    tile("Utenlandske fartøy", noAis ? "–" : nf(a.utenlandske), noAis ? "AIS utilgjengelig" : `${a.antall_flagg} flaggstater`, "#maritim"),
+    tile("AIS-varsler, 24 t", noAis ? "–" : nf(high + mid), noAis ? "AIS utilgjengelig" : `${high} høy · ${mid} middels`, "#maritim", high ? "alert" : ""),
     tile("Nyhetssaker, 24 t", nf(n.siste_24), deltaTxt, "#nyheter"),
     tile("Emneord-treff, 24 t", nf(n.treff_24), "saker som nevner et emneord", "#nyheter", n.treff_24 ? "warn" : ""),
-    STATIC
+    STATIC && noAis
+      ? tile("Nyhetskilder", nf(n.kilder.length), "RSS, analysert med spaCy", "#")
+      : STATIC
       ? tile("AIS-meldinger", nf(d.øyeblikksbilde.meldinger), `mottatt på ${Math.round(d.øyeblikksbilde.ais_sekunder / 60)} min lytting`, "#")
       : tile("Entiteter i lageret", nf(ents), `${nf(d.lager.relasjoner)} relasjoner`, "#sok"),
   ].join("");
@@ -1053,15 +1060,19 @@ async function loadDashboard() {
     const a = d.ais, n = d.nyheter;
     renderTiles(d);
     renderDashMap(a);
+    if (aisMissing(d)) {
+      document.getElementById("dash-map").insertAdjacentHTML("beforeend", `<div class="map-note">${AIS_MISSING}</div>`);
+    }
     bars(document.getElementById("dash-flags"),
-      a.flagg.filter((f) => f.navn !== "Norge").slice(0, 11).map((f) => ({ ...f, href: `flagg=${f.navn}` })), { unit: "fartøy" });
-    donut(document.getElementById("dash-types"), a.kategorier);
+      a.flagg.filter((f) => f.navn !== "Norge").slice(0, 11).map((f) => ({ ...f, href: `flagg=${f.navn}` })), { unit: "fartøy", empty: aisMissing(d) ? AIS_MISSING : undefined });
+    if (aisMissing(d)) document.getElementById("dash-types").innerHTML = `<p class="hint">${AIS_MISSING}</p>`;
+    else donut(document.getElementById("dash-types"), a.kategorier);
     newsColumns(document.getElementById("dash-news"), n.per_time, d.tid);
     document.getElementById("dash-news-total").textContent = `${nf(n.per_time.reduce((s, x) => s + x, 0))} saker fra ${n.kilder.length} kilder`;
-    bars(document.getElementById("dash-zones"), a.soner.map((z) => ({
+    bars(document.getElementById("dash-zones"), (aisMissing(d) ? [] : a.soner).map((z) => ({
       navn: z.navn, antall: z.naer, href: `e=zone:${z.id}`,
       tip: `<b>${esc(z.navn)}</b><br>${z.inne} i sonen, ${z.naer} innen dobbel radius<br>${z.utenlandske} utenlandske`,
-    })), { unit: "fartøy" });
+    })), { unit: "fartøy", empty: aisMissing(d) ? AIS_MISSING : undefined });
     bars(document.getElementById("dash-keywords"), n.emneord.slice(0, 10).map((k) => ({ ...k, href: `sok=${k.navn}` })),
       { unit: "saker", empty: "Ingen saker med emneord siste 7 døgn." });
     bars(document.getElementById("dash-orgs"), n.topp.ORG.map((o) => ({ navn: o.tekst, antall: o.antall, href: `sok=${o.tekst}` })), { unit: "saker, 72 t" });
@@ -1080,7 +1091,7 @@ async function loadDashboard() {
       : `Oppdatert ${fmtTime(d.tid)} · oppdateres hvert 30. sekund`;
     if (STATIC) {
       const pill = document.getElementById("ais-status");
-      pill.textContent = `Øyeblikksbilde · ${nf(a.fartoy)} fartøy`;
+      pill.textContent = aisMissing(d) ? "Øyeblikksbilde · uten AIS" : `Øyeblikksbilde · ${nf(a.fartoy)} fartøy`;
       pill.classList.add("ok");
     }
   } catch (e) { console.error(e); }

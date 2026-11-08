@@ -32,7 +32,8 @@ async def collect(seconds: int) -> ais.AISStore:
 async def main(seconds: int, out: Path) -> None:
     store = await collect(seconds)
     data = dashboard.summary(store)
-    data["øyeblikksbilde"] = {"ais_sekunder": seconds, "meldinger": store.messages}
+    data["øyeblikksbilde"] = {"ais_sekunder": seconds, "meldinger": store.messages,
+                              "ais_tilgjengelig": store.messages > 0}
     out.mkdir(parents=True, exist_ok=True)
     (out / "dashboard.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     (out / "zones.json").write_text(json.dumps(store.zones, ensure_ascii=False), encoding="utf-8")

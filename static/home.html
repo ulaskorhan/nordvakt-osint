@@ -113,7 +113,9 @@
       document.querySelectorAll(".cards .card").forEach((a) => { a.href = "app.html"; });
       fetch("data/dashboard.json").then((r) => r.json()).then((d) => {
         const when = new Date(d.tid * 1000).toLocaleTimeString("no-NO", { hour: "2-digit", minute: "2-digit" });
-        document.getElementById("live-text").textContent = `${d.ais.fartoy.toLocaleString("no-NO")} fartøy i siste øyeblikksbilde (kl. ${when})`;
+        document.getElementById("live-text").textContent = d.øyeblikksbilde.ais_tilgjengelig
+          ? `${d.ais.fartoy.toLocaleString("no-NO")} fartøy i siste øyeblikksbilde (kl. ${when})`
+          : `${d.nyheter.siste_24.toLocaleString("no-NO")} nyhetssaker siste døgn (øyeblikksbilde kl. ${when})`;
       }).catch(() => { document.getElementById("live-text").textContent = "Øyeblikksbilde utilgjengelig"; });
     } else {
     document.getElementById("home-search").addEventListener("submit", (evt) => {

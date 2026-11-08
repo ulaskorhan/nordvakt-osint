@@ -36,7 +36,10 @@ jobs:
           # Språkmodellen hentes fra Hugging Face. GitHub Releases, som spacy download
           # bruker, svarer ofte med 504 fra Actions og er bare reserve.
           for i in 1 2 3; do
-            pip install https://huggingface.co/spacy/nb_core_news_md/resolve/main/nb_core_news_md-any-py3-none-any.whl && break
+            # Hugging Face kaller filen «-any-», som pip ikke godtar som versjon
+            curl -fsSL -o /tmp/nb_core_news_md-3.8.0-py3-none-any.whl \
+              https://huggingface.co/spacy/nb_core_news_md/resolve/main/nb_core_news_md-any-py3-none-any.whl \
+              && pip install /tmp/nb_core_news_md-3.8.0-py3-none-any.whl && break
             python -m spacy download nb_core_news_md && break
             echo "Nedlasting feilet, prøver igjen om $((i * 20)) sek"; sleep $((i * 20))
           done

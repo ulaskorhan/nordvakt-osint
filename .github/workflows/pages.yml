@@ -23,9 +23,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -33,10 +33,12 @@ jobs:
       - name: Installer avhengigheter
         run: |
           pip install -r requirements.txt
-          # Modellen lastes ned fra GitHub Releases, som av og til svarer med 5xx
-          for i in 1 2 3 4 5; do
+          # Språkmodellen hentes fra Hugging Face. GitHub Releases, som spacy download
+          # bruker, svarer ofte med 504 fra Actions og er bare reserve.
+          for i in 1 2 3; do
+            pip install https://huggingface.co/spacy/nb_core_news_md/resolve/main/nb_core_news_md-any-py3-none-any.whl && break
             python -m spacy download nb_core_news_md && break
-            echo "Nedlasting feilet, prøver igjen om $((i * 15)) sek"; sleep $((i * 15))
+            echo "Nedlasting feilet, prøver igjen om $((i * 20)) sek"; sleep $((i * 20))
           done
           python -c "import spacy; spacy.load('nb_core_news_md')"
 

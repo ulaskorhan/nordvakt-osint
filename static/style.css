@@ -197,6 +197,13 @@ a.chip { text-decoration: none; display: inline-block; }
 .related-group .rel { color: var(--muted); font-size: 12px; margin-left: auto; white-space: nowrap; }
 
 /* ---------- Oversikt ---------- */
+.static-note { display: none; }
+.static .static-note {
+  display: block; margin: 0 0 12px; padding: 10px 14px; border: 1px solid #2a5a6e; border-radius: 8px;
+  background: rgba(79, 179, 217, 0.08); font-size: 13px; color: var(--text);
+}
+.static-note a { color: var(--accent); }
+.static nav .tab:not([data-view="oversikt"]) { display: none; }
 #view-oversikt.view.active { display: block; overflow-y: auto; }
 .dash { padding: 16px; max-width: 1600px; margin: 0 auto; }
 .dash-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }

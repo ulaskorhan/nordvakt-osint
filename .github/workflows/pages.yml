@@ -1,0 +1,64 @@
+# Statisk demo på GitHub Pages: henter AIS og nyheter, lager et øyeblikksbilde
+# av oversikten og publiserer forsiden og oversikten. Kjører hver time.
+name: GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installer avhengigheter
+        run: |
+          pip install -r requirements.txt
+          python -m spacy download nb_core_news_md
+
+      # Nyhetsbasen tas vare på mellom kjøringene, slik at grafen dekker 72 timer
+      # og steder ikke må slås opp i Kartverket på nytt hver gang
+      - uses: actions/cache@v4
+        with:
+          path: data/nyheter.sqlite
+          key: nyheter-${{ github.run_id }}
+          restore-keys: nyheter-
+
+      - name: Lag øyeblikksbilde
+        run: python -m scripts.snapshot --ais-sekunder 240
+
+      - name: Bygg nettsiden
+        run: python -m scripts.build_site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

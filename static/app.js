@@ -1,7 +1,13 @@
 // AIS-navn og registerdata er ukontrollert input: alt settes inn via esc() eller textContent.
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// Statisk modus (GitHub Pages): ingen server, bare et øyeblikksbilde av oversikten
+// som GitHub Actions lager hver time. Se scripts/snapshot.py.
+const STATIC = window.NORDVAKT_STATIC === true;
+const STATIC_FILES = { "/api/dashboard": "data/dashboard.json", "/api/zones": "data/zones.json" };
+if (STATIC) document.body.classList.add("static");
 const getJSON = async (url) => {
-  const r = await fetch(url);
+  if (STATIC && !STATIC_FILES[url]) throw new Error(`Ikke tilgjengelig i statisk versjon: ${url}`);
+  const r = await fetch(STATIC ? STATIC_FILES[url] : url);
   if (!r.ok) throw new Error(`${r.status} ${url}`);
   return r.json();
 };
@@ -167,8 +173,10 @@ async function refreshStatus() {
 document.getElementById("vessel-filter").addEventListener("input", renderVessels);
 document.getElementById("only-foreign").addEventListener("change", renderVessels);
 
-refreshStatus(); refreshVessels(); refreshAlerts();
-setInterval(refreshStatus, 5000);
+if (!STATIC) {
+  refreshStatus(); refreshVessels(); refreshAlerts();
+  setInterval(refreshStatus, 5000);
+}
 // Rundt 4 000 fartøy: hentes bare når kartet faktisk vises
 const mapVisible = () => document.getElementById("view-maritim").classList.contains("active");
 setInterval(() => { if (mapVisible()) refreshVessels(); }, 10000);
@@ -616,8 +624,10 @@ document.getElementById("news-q").addEventListener("input", () => {
 document.getElementById("news-hits").addEventListener("change", loadNews);
 document.getElementById("news-hours").addEventListener("change", loadNews);
 
-loadPlaces();
-setInterval(loadPlaces, 120000);
+if (!STATIC) {
+  loadPlaces();
+  setInterval(loadPlaces, 120000);
+}
 setInterval(() => { if (document.getElementById("view-nyheter").classList.contains("active")) loadNews(); }, 60000);
 
 // ---------- Søk og entiteter ----------
@@ -643,6 +653,7 @@ const typeDot = (t) => `<i class="type-dot" style="background:${TYPES[t]?.farge 
 const trunc = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 function route() {
+  if (STATIC) { showView("oversikt"); return; }
   const h = decodeURIComponent(location.hash.slice(1));
   if (h.startsWith("e=")) { showView("sok"); openEntity(h.slice(2)); }
   else if (h.startsWith("sok=")) { showView("sok"); runSearch(h.slice(4)); }
@@ -905,6 +916,7 @@ function wireInteractive(root) {
     el.addEventListener("mousemove", (e) => showTip(e, el.dataset.tip));
     el.addEventListener("mouseleave", hideTip);
   });
+  if (STATIC) { root.querySelectorAll(".link").forEach((el) => el.classList.remove("link")); return; }
   root.querySelectorAll("[data-href]").forEach((el) => el.addEventListener("click", () => {
     hideTip();
     location.hash = el.dataset.href;
@@ -912,8 +924,9 @@ function wireInteractive(root) {
 }
 
 function tile(label, value, sub, href, tone = "") {
-  return `<a class="dash-tile ${tone}" href="${href}"><span class="label">${esc(label)}</span>
-    <span class="value">${esc(value)}</span><span class="sub">${sub}</span></a>`;
+  const tag = STATIC ? "div" : "a";
+  return `<${tag} class="dash-tile ${tone}" ${STATIC ? "" : `href="${href}"`}><span class="label">${esc(label)}</span>
+    <span class="value">${esc(value)}</span><span class="sub">${sub}</span></${tag}>`;
 }
 
 function renderTiles(d) {
@@ -928,7 +941,9 @@ function renderTiles(d) {
     tile("AIS-varsler, 24 t", nf(high + mid), `${high} høy · ${mid} middels`, "#maritim", high ? "alert" : ""),
     tile("Nyhetssaker, 24 t", nf(n.siste_24), deltaTxt, "#nyheter"),
     tile("Emneord-treff, 24 t", nf(n.treff_24), "saker som nevner et emneord", "#nyheter", n.treff_24 ? "warn" : ""),
-    tile("Entiteter i lageret", nf(ents), `${nf(d.lager.relasjoner)} relasjoner`, "#sok"),
+    STATIC
+      ? tile("AIS-meldinger", nf(d.øyeblikksbilde.meldinger), `mottatt på ${Math.round(d.øyeblikksbilde.ais_sekunder / 60)} min lytting`, "#")
+      : tile("Entiteter i lageret", nf(ents), `${nf(d.lager.relasjoner)} relasjoner`, "#sok"),
   ].join("");
 }
 
@@ -985,9 +1000,9 @@ function donut(el, allRows) {
 }
 
 // Søyler per time. Etiketter hver 12. time; tooltip viser timen og antallet.
-function newsColumns(el, perHour) {
+function newsColumns(el, perHour, refEpoch) {
   const max = Math.max(...perHour, 1);
-  const now = new Date();
+  const now = new Date(refEpoch * 1000);
   now.setMinutes(0, 0, 0);
   const hourOf = (i) => new Date(now.getTime() - (71 - i) * 3600e3);
   const fmt = (d) => d.toLocaleString("no-NO", { weekday: "short", hour: "2-digit", minute: "2-digit" });
@@ -1017,11 +1032,11 @@ function renderDashMap(a) {
     L.circleMarker([lat, lon], {
       radius: foreign ? 3 : 2, stroke: false, fillOpacity: foreign ? 0.9 : 0.55,
       fillColor: foreign ? "#4fb3d9" : "#5b6675",
-    }).on("click", () => { location.hash = `e=vessel:${mmsi}`; }).addTo(dashLayer);
+    }).on("click", () => { if (!STATIC) location.hash = `e=vessel:${mmsi}`; }).addTo(dashLayer);
   }
   for (const z of zonesCache) {
     L.circle([z.lat, z.lon], { radius: z.radius_km * 1000, color: "#d4a72c", weight: 1.5, fill: false })
-      .bindTooltip(esc(z.navn)).on("click", () => { location.hash = `e=zone:${z.id}`; }).addTo(dashLayer);
+      .bindTooltip(esc(z.navn)).on("click", () => { if (!STATIC) location.hash = `e=zone:${z.id}`; }).addTo(dashLayer);
   }
 }
 
@@ -1041,7 +1056,7 @@ async function loadDashboard() {
     bars(document.getElementById("dash-flags"),
       a.flagg.filter((f) => f.navn !== "Norge").slice(0, 11).map((f) => ({ ...f, href: `flagg=${f.navn}` })), { unit: "fartøy" });
     donut(document.getElementById("dash-types"), a.kategorier);
-    newsColumns(document.getElementById("dash-news"), n.per_time);
+    newsColumns(document.getElementById("dash-news"), n.per_time, d.tid);
     document.getElementById("dash-news-total").textContent = `${nf(n.per_time.reduce((s, x) => s + x, 0))} saker fra ${n.kilder.length} kilder`;
     bars(document.getElementById("dash-zones"), a.soner.map((z) => ({
       navn: z.navn, antall: z.naer, href: `e=zone:${z.id}`,
@@ -1059,9 +1074,17 @@ async function loadDashboard() {
       <li><div><a href="${esc(safeUrl(t.lenke))}" target="_blank" rel="noopener">${esc(t.tittel)}</a><br>
         <small>${esc(t.kilde)} · ${esc(timeAgo(t.publisert))} · ${t.treff.map(esc).join(", ")}</small></div></li>`),
       "Ingen saker med emneord siste 7 døgn.");
-    document.getElementById("dash-updated").textContent = `Oppdatert ${fmtTime(d.tid)} · oppdateres hvert 30. sekund`;
+    const when = new Date(d.tid * 1000).toLocaleString("no-NO", { weekday: "long", hour: "2-digit", minute: "2-digit" });
+    document.getElementById("dash-updated").textContent = STATIC
+      ? `Øyeblikksbilde fra ${when} · nytt hver time`
+      : `Oppdatert ${fmtTime(d.tid)} · oppdateres hvert 30. sekund`;
+    if (STATIC) {
+      const pill = document.getElementById("ais-status");
+      pill.textContent = `Øyeblikksbilde · ${nf(a.fartoy)} fartøy`;
+      pill.classList.add("ok");
+    }
   } catch (e) { console.error(e); }
 }
-setInterval(() => { if (dashVisible()) loadDashboard(); }, 30000);
+setInterval(() => { if (dashVisible() && !STATIC) loadDashboard(); }, 30000);
 
 route();

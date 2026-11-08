@@ -2,6 +2,8 @@
 
 OSINT-plattform for Norge, bygget på åpne offentlige data.
 
+**Demo:** https://ulaskorhan.github.io/nordvakt-osint/ (statisk øyeblikksbilde av oversikten, oppdatert hver time)
+
 ## Arkitektur: entiteter, connectors og visninger
 
 Alt er en **entitet** med en id på formen `<prefiks>:<nøkkel>`:
@@ -47,6 +49,12 @@ python3 -m venv .venv
 ```
 
 Åpne http://localhost:8000.
+
+## Statisk demo på GitHub Pages
+
+GitHub Pages kan bare vise statiske filer, så demoen er et øyeblikksbilde. `.github/workflows/pages.yml` kjører hver time: `scripts/snapshot.py` lytter på AIS i fire minutter og henter nyhetene, og `scripts/build_site.py` bygger forsiden og oversikten med dataene som JSON. Søk, live-kart og selskapsnettverk finnes bare når du kjører Nordvakt selv.
+
+GitHub stanser planlagte kjøringer etter 60 dager uten aktivitet i repoet. Start dem igjen under Actions.
 
 ## Avgrensning
 

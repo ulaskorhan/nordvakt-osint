@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nordvakt</title>
   <meta name="description" content="Et enkelt verktøy som viser hvordan åpne kilder kan brukes til OSINT i Norge.">
-  <link rel="stylesheet" href="/static/home.css?v=3">
+  <link rel="stylesheet" href="/static/home.css?v=4">
 </head>
 <body>
   <header class="top">
@@ -32,6 +32,10 @@
         <a href="/app#sok=Bodø">Bodø</a>
       </p>
       <p class="live"><span class="pulse"></span><span id="live-text">Kobler til AIS…</span></p>
+      <p class="static-cta" hidden>
+        <a class="button" href="/app">Se oversikten →</a>
+        <span>Dette er en statisk demo med et øyeblikksbilde som lages hver time. For søk, live-kart og selskapsnettverk kjører du Nordvakt selv, se <a href="https://github.com/ulaskorhan/nordvakt-osint#kjøre-lokalt" target="_blank" rel="noopener">GitHub</a>.</span>
+      </p>
     </section>
 
     <section class="cards">
@@ -102,6 +106,16 @@
   </footer>
 
   <script>
+    if (window.NORDVAKT_STATIC) {
+      // GitHub Pages: ingen server bak, så søk og fanelenker byttes ut med oversikten
+      document.querySelectorAll("#home-search, .hero .examples").forEach((el) => el.remove());
+      document.querySelector(".static-cta").hidden = false;
+      document.querySelectorAll(".cards .card").forEach((a) => { a.href = "app.html"; });
+      fetch("data/dashboard.json").then((r) => r.json()).then((d) => {
+        const when = new Date(d.tid * 1000).toLocaleTimeString("no-NO", { hour: "2-digit", minute: "2-digit" });
+        document.getElementById("live-text").textContent = `${d.ais.fartoy.toLocaleString("no-NO")} fartøy i siste øyeblikksbilde (kl. ${when})`;
+      }).catch(() => { document.getElementById("live-text").textContent = "Øyeblikksbilde utilgjengelig"; });
+    } else {
     document.getElementById("home-search").addEventListener("submit", (evt) => {
       evt.preventDefault();
       const q = document.getElementById("home-q").value.trim();
@@ -114,6 +128,7 @@
     }).catch(() => {
       document.getElementById("live-text").textContent = "AIS-status utilgjengelig";
     });
+    }
   </script>
 </body>
 </html>

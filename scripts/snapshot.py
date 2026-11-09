@@ -23,10 +23,10 @@ async def collect(seconds: int) -> tuple[ais.AISStore, str]:
     store = ais.AISStore(ais.load_zones())
     creds = barentswatch.credentials()
     if creds:
-        try:
-            await asyncio.gather(news.fetch_all(), barentswatch.load_latest(store, *creds))
-        except Exception:
-            logging.exception("BarentsWatch feilet")
+        _, result = await asyncio.gather(news.fetch_all(), barentswatch.load_latest(store, *creds),
+                                         return_exceptions=True)
+        if isinstance(result, Exception):
+            logging.error("BarentsWatch feilet: %s", result)
         return store, "BarentsWatch"
     task = asyncio.create_task(ais.run(store))
     try:

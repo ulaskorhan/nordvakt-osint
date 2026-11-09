@@ -25,7 +25,9 @@ LATEST_URL = "https://live.ais.barentswatch.no/v1/latest/combined"
 
 
 def credentials() -> tuple[str, str] | None:
-    cid, secret = os.environ.get("BARENTSWATCH_CLIENT_ID"), os.environ.get("BARENTSWATCH_CLIENT_SECRET")
+    # Innlimte nøkler får lett med seg mellomrom eller linjeskift
+    cid = (os.environ.get("BARENTSWATCH_CLIENT_ID") or "").strip()
+    secret = (os.environ.get("BARENTSWATCH_CLIENT_SECRET") or "").strip()
     return (cid, secret) if cid and secret else None
 
 
@@ -62,7 +64,10 @@ async def load_latest(store: AISStore, client_id: str, secret: str) -> int:
         tok = await client.post(TOKEN_URL, data={
             "client_id": client_id, "client_secret": secret, "scope": "ais", "grant_type": "client_credentials",
         })
-        tok.raise_for_status()
+        if tok.is_error:
+            # OAuth-feilen (f.eks. invalid_client, invalid_scope) inneholder ingen hemmeligheter
+            log.error("Token avvist (%d): %s", tok.status_code, tok.text[:300])
+            tok.raise_for_status()
         token = tok.json()["access_token"]
         resp = await client.get(LATEST_URL, headers={"Authorization": f"Bearer {token}"})
         provenance.log("BarentsWatch AIS", LATEST_URL, resp.status_code, resp.content)

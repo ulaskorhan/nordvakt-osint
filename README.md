@@ -54,6 +54,8 @@ python3 -m venv .venv
 
 GitHub Pages kan bare vise statiske filer, så demoen er et øyeblikksbilde. `.github/workflows/pages.yml` kjører hver time: `scripts/snapshot.py` lytter på AIS i fire minutter og henter nyhetene, og `scripts/build_site.py` bygger forsiden og oversikten med dataene som JSON. Søk, live-kart og selskapsnettverk finnes bare når du kjører Nordvakt selv.
 
+Kystverkets TCP-strøm svarer ikke fra GitHub, så demoen henter AIS fra BarentsWatch sitt AIS-API (`app/barentswatch.py`). Det krever en gratis API-klient fra https://www.barentswatch.no/minside/ med tilgang til AIS, lagret som repo-hemmelighetene `BARENTSWATCH_CLIENT_ID` og `BARENTSWATCH_CLIENT_SECRET`.
+
 GitHub stanser planlagte kjøringer etter 60 dager uten aktivitet i repoet. Start dem igjen under Actions.
 
 ## Avgrensning

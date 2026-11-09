@@ -53,7 +53,12 @@ jobs:
           key: nyheter-${{ github.run_id }}
           restore-keys: nyheter-
 
+      # Kystverkets TCP-strøm svarer ikke fra GitHub, så AIS hentes fra BarentsWatch
+      # når repo-hemmelighetene finnes. Uten dem prøves TCP-strømmen.
       - name: Lag øyeblikksbilde
+        env:
+          BARENTSWATCH_CLIENT_ID: ${{ secrets.BARENTSWATCH_CLIENT_ID }}
+          BARENTSWATCH_CLIENT_SECRET: ${{ secrets.BARENTSWATCH_CLIENT_SECRET }}
         run: python -m scripts.snapshot --ais-sekunder 240
 
       - name: Bygg nettsiden

@@ -1,7 +1,8 @@
 """Lager et øyeblikksbilde av oversikten til den statiske versjonen på GitHub Pages.
 
-Lytter på AIS-strømmen i noen minutter, henter og analyserer nyhetene, og skriver
-samme JSON som /api/dashboard til site/data/.
+Henter AIS, henter og analyserer nyhetene, og skriver samme JSON som /api/dashboard
+til site/data/. AIS hentes fra BarentsWatch når BARENTSWATCH_CLIENT_ID og
+BARENTSWATCH_CLIENT_SECRET er satt, ellers ved å lytte på Kystverkets TCP-strøm.
 
     python -m scripts.snapshot --ais-sekunder 240
 """
@@ -12,28 +13,35 @@ import json
 import logging
 from pathlib import Path
 
-from app import ais, dashboard, news
+from app import ais, barentswatch, dashboard, news
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
-async def collect(seconds: int) -> ais.AISStore:
-    """AIS og nyheter hentes samtidig. AIS lyttes på i minst `seconds` sekunder."""
+async def collect(seconds: int) -> tuple[ais.AISStore, str]:
+    """AIS og nyheter hentes samtidig. TCP-strømmen lyttes på i minst `seconds` sekunder."""
     store = ais.AISStore(ais.load_zones())
+    creds = barentswatch.credentials()
+    if creds:
+        try:
+            await asyncio.gather(news.fetch_all(), barentswatch.load_latest(store, *creds))
+        except Exception:
+            logging.exception("BarentsWatch feilet")
+        return store, "BarentsWatch"
     task = asyncio.create_task(ais.run(store))
     try:
         await asyncio.gather(news.fetch_all(), asyncio.sleep(seconds))
     finally:
         task.cancel()
     store.connected = store.messages > 0
-    return store
+    return store, "Kystverket TCP"
 
 
 async def main(seconds: int, out: Path) -> None:
-    store = await collect(seconds)
+    store, source = await collect(seconds)
     data = dashboard.summary(store)
     data["øyeblikksbilde"] = {"ais_sekunder": seconds, "meldinger": store.messages,
-                              "ais_tilgjengelig": store.messages > 0}
+                              "ais_tilgjengelig": store.messages > 0, "ais_kilde": source}
     out.mkdir(parents=True, exist_ok=True)
     (out / "dashboard.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     (out / "zones.json").write_text(json.dumps(store.zones, ensure_ascii=False), encoding="utf-8")

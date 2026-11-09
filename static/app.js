@@ -949,7 +949,7 @@ function renderTiles(d) {
     STATIC && noAis
       ? tile("Nyhetskilder", nf(n.kilder.length), "RSS, analysert med spaCy", "#")
       : STATIC
-      ? tile("AIS-meldinger", nf(d.øyeblikksbilde.meldinger), `mottatt på ${Math.round(d.øyeblikksbilde.ais_sekunder / 60)} min lytting`, "#")
+      ? tile("AIS-kilde", d.øyeblikksbilde.ais_kilde || "Kystverket", "siste kjente posisjoner", "#")
       : tile("Entiteter i lageret", nf(ents), `${nf(d.lager.relasjoner)} relasjoner`, "#sok"),
   ].join("");
 }

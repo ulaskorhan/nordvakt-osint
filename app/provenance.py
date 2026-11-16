@@ -45,3 +45,17 @@ def recent(limit: int = 100) -> list[dict]:
         {"tidspunkt": r[0], "kilde": r[1], "url": r[2], "status": r[3], "sha256": r[4]}
         for r in rows
     ]
+
+
+def summary() -> list[dict]:
+    """Én rad per kilde: antall oppslag og det siste oppslaget."""
+    with _lock:
+        rows = _conn.execute(
+            """SELECT k.kilde, n.antall, k.tidspunkt, k.status, k.sha256, k.url
+               FROM kildelogg k
+               JOIN (SELECT kilde, COUNT(*) AS antall, MAX(id) AS siste FROM kildelogg GROUP BY kilde) n
+                 ON n.siste = k.id
+               ORDER BY k.kilde"""
+        ).fetchall()
+    return [{"kilde": r[0], "oppslag": r[1], "sist": r[2], "status": r[3], "sha256": r[4], "url": r[5]}
+            for r in rows]

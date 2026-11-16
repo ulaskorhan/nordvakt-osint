@@ -300,6 +300,83 @@ a.chip { text-decoration: none; display: inline-block; }
 }
 .dash-tip[hidden] { display: none; }
 
+/* Visningsvalg, seksjoner og enkel visning */
+.dash-head { justify-content: space-between; align-items: center; flex-wrap: wrap; }
+.dash-head > div:first-child { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.mode { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.mode button { background: none; border: 0; border-radius: 0; color: var(--muted); padding: 6px 14px; font-size: 13px; }
+.mode button.active { background: var(--accent); color: #06121a; font-weight: 600; }
+.sec { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 28px 0 10px; font-size: 16px; font-weight: 600; }
+.sec b, .brief h2 b {
+  display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid var(--accent); color: var(--accent); font-size: 12px; font-weight: 600; flex: none; align-self: center;
+}
+.sec small { font-size: 12px; font-weight: 400; color: var(--muted); }
+
+.brief { max-width: 720px; margin: 24px auto 48px; font-size: 15px; line-height: 1.6; }
+.brief-lead { font-size: 19px; line-height: 1.55; margin: 0 0 8px; }
+.brief section { border-top: 1px solid var(--border); margin-top: 28px; padding-top: 20px; }
+.brief h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; font-size: 17px; font-weight: 600; }
+.brief p { margin: 0 0 10px; color: var(--muted); }
+.brief p.brief-lead { color: var(--text); }
+.brief ul { list-style: none; margin: 0; padding: 0; }
+.brief li { padding: 9px 0; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+.brief li:last-child { border-bottom: 0; }
+.brief li a { color: var(--text); text-decoration: none; }
+.brief li a:hover { color: var(--accent); }
+.brief li small { color: var(--muted); font-size: 13px; }
+.brief li small a { color: var(--muted); text-decoration: underline; }
+.brief-more { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 32px !important; }
+.brief-more button { padding: 9px 16px; font-size: 14px; font-weight: 600; }
+.brief-foot { font-size: 12px; margin-top: 18px !important; }
+
+.card.auto { height: auto; }
+.card.xtall { height: 460px; }
+.card.span4 { grid-column: 1 / -1; }
+.card-body.mapbody { padding: 0; margin: 0 1px 1px; border-radius: 0 0 7px 7px; overflow: hidden; background: var(--bg); position: relative; }
+.muted { color: var(--muted); }
+
+.dtable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dtable th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.dtable td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+.dtable tr:last-child td { border-bottom: 0; }
+.dtable .num { font-variant-numeric: tabular-nums; }
+.dtable .barcell { white-space: nowrap; min-width: 110px; }
+.dtable .mini { display: inline-block; width: 70px; height: 8px; vertical-align: middle; margin-right: 8px; }
+.dtable .mini i { display: block; height: 100%; background: var(--accent); border-radius: 0 3px 3px 0; }
+.dtable .last a { color: var(--text); text-decoration: none; }
+.dtable .last a:hover { color: var(--accent); }
+.dtable code, .method code { font-size: 12px; color: var(--muted); }
+.dtable .ok { color: #57c785; }
+.dtable .bad { color: #ffb3ae; }
+.card.auto .card-body { overflow-x: auto; }
+.pillet { display: inline-block; padding: 1px 8px; margin: 0 4px 3px 0; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; white-space: nowrap; }
+
+.method dl { margin: 0; display: grid; grid-template-columns: 130px 1fr; gap: 10px 14px; font-size: 13px; line-height: 1.5; }
+.method dt { color: var(--text); font-weight: 600; }
+.method dd { margin: 0; color: var(--muted); }
+
+.rel { position: relative; display: flex; justify-content: space-between; gap: 22%; min-height: 100%; }
+.rel-col { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; position: relative; z-index: 1; }
+.rel-col li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); font-size: 13px; cursor: pointer; }
+.rel-col li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rel-col li small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.rel-col li.rel-h { border: 0; background: none; padding: 0 2px 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); cursor: default; }
+.rel-col.org li[data-kind] { border-left: 3px solid #4fb3d9; }
+.rel-col.sted li[data-kind] { border-right: 3px solid #7ee0c3; }
+.rel-col.sted li[data-kind] { flex-direction: row-reverse; }
+.rel-col.sted li span { text-align: left; }
+.rel-col li.dim { opacity: 0.45; }
+.rel-col li.on { border-color: var(--accent); opacity: 1; }
+.rel-col.sted li.on { border-color: #7ee0c3; }
+.rel-lines { position: absolute; inset: 0; width: 100%; height: 100%; }
+.rel-lines path { fill: none; stroke: #5b6675; opacity: 0.45; cursor: pointer; }
+.rel-lines path.on { stroke: var(--accent); opacity: 0.95; }
+.rel-group { margin-bottom: 12px; }
+.rel-group h4 { margin: 0 0 2px; font-size: 13px; font-weight: 400; }
+.rel-group h4 a { color: var(--text); }
+.rel-note { margin-top: 10px; }
+
 @media (max-width: 1200px) {
   .dash-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .dash-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -308,6 +385,10 @@ a.chip { text-decoration: none; display: inline-block; }
   .dash-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dash-grid { grid-template-columns: minmax(0, 1fr); }
   .card.span2 { grid-column: auto; }
+  .method dl { grid-template-columns: 1fr; gap: 2px; }
+  .method dd { margin-bottom: 10px; }
+  .rel { gap: 12%; }
+  .brief-lead { font-size: 17px; }
   .dash-tile .value { font-size: 22px; }
 }
 

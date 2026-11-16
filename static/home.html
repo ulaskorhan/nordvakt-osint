@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nordvakt</title>
   <meta name="description" content="Et enkelt verktøy som viser hvordan åpne kilder kan brukes til OSINT i Norge.">
-  <link rel="stylesheet" href="/static/home.css?v=4">
+  <link rel="stylesheet" href="/static/home.css?v=5">
 </head>
 <body>
   <header class="top">
@@ -33,43 +33,54 @@
       </p>
       <p class="live"><span class="pulse"></span><span id="live-text">Kobler til AIS…</span></p>
       <p class="static-cta" hidden>
-        <a class="button" href="/app">Se oversikten →</a>
+        <a class="button" href="/app">Se situasjonsbildet →</a>
         <span>Dette er en statisk demo med et øyeblikksbilde som lages hver time. For søk, live-kart og selskapsnettverk kjører du Nordvakt selv, se <a href="https://github.com/ulaskorhan/nordvakt-osint#kjøre-lokalt" target="_blank" rel="noopener">GitHub</a>.</span>
       </p>
     </section>
 
     <section class="cards">
+      <a class="card" href="/app#nyheter">
+        <span class="step">1</span>
+        <h2>Nyheter</h2>
+        <p>Saker fra norske medier og myndigheter. En norsk språkmodell finner organisasjoner og steder, og plasserer sakene på kartet.</p>
+        <span class="more">Les siste saker →</span>
+      </a>
+      <a class="card" href="/app#nettverk">
+        <span class="step">2</span>
+        <h2>Selskaper og organisasjoner</h2>
+        <p>Navn fra nyhetene slås opp i Enhetsregisteret. Se hvem som sitter i styret, hvem som er revisor og hvordan selskaper henger sammen.</p>
+        <span class="more">Start et søk →</span>
+      </a>
       <a class="card" href="/app#maritim">
+        <span class="step">3</span>
         <h2>Maritim</h2>
         <p>Skip langs norskekysten i sanntid, med flaggstat og varsler når fartøy oppholder seg nær kritisk infrastruktur.</p>
         <span class="more">Åpne kartet →</span>
       </a>
-      <a class="card" href="/app#nyheter">
-        <h2>Nyheter</h2>
-        <p>Nyheter fra norske medier og myndigheter, der språkmodellen finner organisasjoner og steder og plasserer sakene på kartet.</p>
-        <span class="more">Les siste saker →</span>
-      </a>
-      <a class="card" href="/app#nettverk">
-        <h2>Selskapsnettverk</h2>
-        <p>Søk opp et selskap og se hvem som sitter i styret, hvem som er revisor og hvordan selskaper henger sammen.</p>
-        <span class="more">Start et søk →</span>
-      </a>
+    </section>
+
+    <section class="together">
+      <h2 class="section-title">Sammenhenger</h2>
+      <p>Hver kilde sier litt. Sammen sier de mer. Nordvakt viser hvilke organisasjoner og steder som nevnes i de samme sakene,
+        hvilke land som omtales i nyhetene, og hvor mange fartøy som seiler under samme flagg akkurat nå.
+        En kobling er en indikator som må vurderes av et menneske. Sakene bak vises alltid.</p>
+      <a class="more" href="/app">Se situasjonsbildet →</a>
     </section>
 
     <section>
       <h2 class="section-title">Kilder</h2>
       <ul class="rows">
         <li>
-          <div><a href="https://www.kystverket.no/navigasjonstjenester/ais/" target="_blank" rel="noopener">Kystverket – AIS</a><small>Posisjon, fart og identitet for skip</small></div>
-          <span class="freq">Sanntid · kartet oppdateres hvert 10. sek.</span>
+          <div>NRK, E24, VG, Teknisk Ukeblad og regjeringen.no<small>Titler og ingresser fra RSS</small></div>
+          <span class="freq">Hvert 15. minutt</span>
         </li>
         <li>
           <div><a href="https://data.brreg.no/enhetsregisteret/api/docs/index.html" target="_blank" rel="noopener">Brønnøysundregistrene – Enhetsregisteret</a><small>Selskaper, roller og eierstruktur</small></div>
           <span class="freq">Hentes direkte ved hvert søk</span>
         </li>
         <li>
-          <div>NRK, E24, VG, Teknisk Ukeblad og regjeringen.no<small>Titler og ingresser fra RSS</small></div>
-          <span class="freq">Hvert 15. minutt</span>
+          <div><a href="https://www.kystverket.no/navigasjonstjenester/ais/" target="_blank" rel="noopener">Kystverket – AIS</a><small>Posisjon, fart og identitet for skip. Den offentlige demoen henter samme data via <a href="https://www.barentswatch.no/" target="_blank" rel="noopener">BarentsWatch</a></small></div>
+          <span class="freq">Sanntid · kartet oppdateres hvert 10. sek.</span>
         </li>
         <li>
           <div><a href="https://www.kartverket.no/" target="_blank" rel="noopener">Kartverket</a><small>Bakgrunnskart og stedsnavnregisteret</small></div>
@@ -110,12 +121,13 @@
       // GitHub Pages: ingen server bak, så søk og fanelenker byttes ut med oversikten
       document.querySelectorAll("#home-search, .hero .examples").forEach((el) => el.remove());
       document.querySelector(".static-cta").hidden = false;
-      document.querySelectorAll(".cards .card").forEach((a) => { a.href = "app.html"; });
+      document.querySelectorAll(".cards .card, .together .more").forEach((a) => { a.href = "app.html"; });
       fetch("data/dashboard.json").then((r) => r.json()).then((d) => {
         const when = new Date(d.tid * 1000).toLocaleTimeString("no-NO", { hour: "2-digit", minute: "2-digit" });
+        const saker = `${d.nyheter.siste_24.toLocaleString("no-NO")} nyhetssaker siste døgn`;
         document.getElementById("live-text").textContent = d.øyeblikksbilde.ais_tilgjengelig
-          ? `${d.ais.fartoy.toLocaleString("no-NO")} fartøy i siste øyeblikksbilde (kl. ${when})`
-          : `${d.nyheter.siste_24.toLocaleString("no-NO")} nyhetssaker siste døgn (øyeblikksbilde kl. ${when})`;
+          ? `${saker} og ${d.ais.fartoy.toLocaleString("no-NO")} fartøy i øyeblikksbildet fra kl. ${when}`
+          : `${saker} (øyeblikksbilde kl. ${when})`;
       }).catch(() => { document.getElementById("live-text").textContent = "Øyeblikksbilde utilgjengelig"; });
     } else {
     document.getElementById("home-search").addEventListener("submit", (evt) => {

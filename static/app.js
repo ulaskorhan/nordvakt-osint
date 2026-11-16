@@ -934,23 +934,19 @@ const aisMissing = (d) => STATIC && d.øyeblikksbilde && !d.øyeblikksbilde.ais_
 const AIS_MISSING = "AIS-strømmen var ikke tilgjengelig da øyeblikksbildet ble laget. Kjør Nordvakt lokalt for sanntidsdata fra Kystverket.";
 
 function renderTiles(d) {
-  const a = d.ais, n = d.nyheter;
+  const a = d.ais, n = d.nyheter, r = d.sammenhenger;
   const noAis = aisMissing(d);
   const delta = n.siste_24 - n.forrige_24;
   const deltaTxt = n.forrige_24 ? `<b class="${delta >= 0 ? "up" : "down"}">${delta >= 0 ? "↑" : "↓"} ${nf(Math.abs(delta))}</b> mot døgnet før` : "siste 24 timer";
-  const ents = Object.values(d.lager.entiteter).reduce((s, x) => s + x, 0);
   const high = a.varsler_24["høy"], mid = a.varsler_24.middels;
+  // Samme rekkefølge som seksjonene: nyheter, organisasjoner, maritim
   document.getElementById("dash-tiles").innerHTML = [
+    tile("Nyhetssaker, 24 t", nf(n.siste_24), deltaTxt, "#nyheter"),
+    tile("Emneord-treff, 24 t", nf(n.treff_24), "saker som nevner et emneord", "#nyheter", n.treff_24 ? "warn" : ""),
+    tile("Saker med kobling, 72 t", nf(r.saker_med_kobling), "organisasjon og sted i samme sak", "#nyheter"),
     tile("Fartøy nå", noAis ? "–" : nf(a.fartoy), noAis ? "AIS utilgjengelig" : `${nf(a.i_bevegelse)} i bevegelse`, "#maritim"),
     tile("Utenlandske fartøy", noAis ? "–" : nf(a.utenlandske), noAis ? "AIS utilgjengelig" : `${a.antall_flagg} flaggstater`, "#maritim"),
     tile("AIS-varsler, 24 t", noAis ? "–" : nf(high + mid), noAis ? "AIS utilgjengelig" : `${high} høy · ${mid} middels`, "#maritim", high ? "alert" : ""),
-    tile("Nyhetssaker, 24 t", nf(n.siste_24), deltaTxt, "#nyheter"),
-    tile("Emneord-treff, 24 t", nf(n.treff_24), "saker som nevner et emneord", "#nyheter", n.treff_24 ? "warn" : ""),
-    STATIC && noAis
-      ? tile("Nyhetskilder", nf(n.kilder.length), "RSS, analysert med spaCy", "#")
-      : STATIC
-      ? tile("AIS-kilde", d.øyeblikksbilde.ais_kilde || "Kystverket", "siste kjente posisjoner", "#")
-      : tile("Entiteter i lageret", nf(ents), `${nf(d.lager.relasjoner)} relasjoner`, "#sok"),
   ].join("");
 }
 
@@ -1052,50 +1048,290 @@ function listItems(el, items, empty) {
   wireInteractive(el);
 }
 
+// ---------- Oversikt: enkel visning, tabeller og sammenhenger ----------
+// Lenker virker bare når det står en server bak. I statisk modus blir de ren tekst.
+const go = (text, href) => (STATIC ? esc(text) : `<a href="#${esc(href)}">${esc(text)}</a>`);
+const artLink = (s) => `<a href="${esc(safeUrl(s.lenke))}" target="_blank" rel="noopener">${esc(s.tittel)}</a>`;
+const artMeta = (s) => `${esc(s.kilde)} · ${esc(timeAgo(s.publisert))}`;
+const plural = (n, one, many) => `${nf(n)} ${n === 1 ? one : many}`;
+const brregLine = (b) => [b.form, b.naering, b.kommune && `${b.kommune[0]}${b.kommune.slice(1).toLowerCase()}`,
+  b.ansatte ? `${nf(b.ansatte)} ansatte` : null].filter(Boolean).map(esc).join(" · ");
+const brregUrl = (orgnr) => `https://virksomhet.brreg.no/nb/oppslag/enheter/${encodeURIComponent(orgnr)}`;
+
+// Enkel visning: situasjonen i klartekst, i fast rekkefølge.
+function renderBrief(d) {
+  const a = d.ais, n = d.nyheter, r = d.sammenhenger;
+  const noAis = aisMissing(d) || !a.fartoy;
+  const orgs = r.topp_organisasjoner.slice(0, 5);
+  const flags = a.flagg.filter((f) => f.navn !== "Norge").slice(0, 3);
+  const zones = a.soner.filter((z) => z.naer).slice(0, 3);
+  const links = r.koblinger.slice(0, 4);
+  const alerts = a.varsler_24["høy"] + a.varsler_24.middels;
+  const lead = [
+    `De siste 24 timene har Nordvakt lest ${plural(n.siste_24, "nyhetssak", "nyhetssaker")} fra ${n.kilder.length} åpne kilder.`,
+    n.treff_24 ? `${plural(n.treff_24, "av dem nevner", "av dem nevner")} et emneord som sabotasje, drone eller kritisk infrastruktur.` : "Ingen av dem nevner et av emneordene som følges.",
+    orgs.length ? `Mest omtalt er ${orgs.slice(0, 2).map((o) => o.navn).join(" og ")}.` : "",
+    noAis ? "" : `Langs kysten følges ${nf(a.fartoy)} fartøy, og ${nf(a.utenlandske)} av dem seiler under utenlandsk flagg.`,
+  ].filter(Boolean).join(" ");
+
+  document.getElementById("brief").innerHTML = `
+    <p class="brief-lead">${esc(lead)}</p>
+
+    <section>
+      <h2><b>1</b>Nyheter</h2>
+      <p>${n.siste_treff.length ? "Siste saker som nevner et emneord:" : "Ingen saker har nevnt et emneord de siste sju døgnene."}</p>
+      <ul>${n.siste_treff.slice(0, 4).map((t) => `<li>${artLink(t)}<small>${artMeta(t)} · emneord: ${t.treff.map(esc).join(", ")}</small></li>`).join("")}</ul>
+    </section>
+
+    <section>
+      <h2><b>2</b>Selskaper og organisasjoner</h2>
+      <p>${orgs.length ? "Mest omtalt de siste tre døgnene. Der navnet finnes entydig i Enhetsregisteret, står registeropplysningene under." : "Ingen organisasjoner er gjenkjent i nyhetene ennå."}</p>
+      <ul>${orgs.map((o) => `<li><span><b>${go(o.navn, `sok=${o.navn}`)}</b> · ${plural(o.antall, "sak", "saker")}</span>
+        <small>${o.brreg ? `<a href="${brregUrl(o.brreg.orgnr)}" target="_blank" rel="noopener">Org.nr. ${esc(o.brreg.orgnr)}</a> · ${brregLine(o.brreg)}` : "Ikke entydig treff i Enhetsregisteret"}${o.steder.length ? `<br>Nevnt sammen med ${o.steder.map(esc).join(", ")}` : ""}</small></li>`).join("")}</ul>
+    </section>
+
+    <section>
+      <h2><b>3</b>Maritim</h2>
+      ${noAis ? `<p>${STATIC ? AIS_MISSING : "AIS-strømmen er ikke tilkoblet akkurat nå."}</p>` : `
+      <p>${nf(a.fartoy)} fartøy sender posisjon langs norskekysten. ${nf(a.utenlandske)} er utenlandske, fra ${a.antall_flagg - 1} flaggstater.
+        ${alerts ? `${plural(alerts, "varsel", "varsler")} er utløst nær overvåkingssonene siste døgn.` : "Ingen varsler er utløst nær overvåkingssonene siste døgn."}</p>
+      <ul>
+        ${flags.length ? `<li><span>Flest utenlandske fartøy</span><small>${flags.map((f) => `${esc(f.navn)} (${nf(f.antall)})`).join(", ")}</small></li>` : ""}
+        ${zones.length ? `<li><span>Flest fartøy nær en sone</span><small>${zones.map((z) => `${esc(z.navn)} (${nf(z.naer)})`).join(", ")}</small></li>` : ""}
+      </ul>`}
+    </section>
+
+    <section>
+      <h2><b>4</b>Sammenhenger</h2>
+      <p>${links.length ? "Organisasjoner og steder som nevnes i de samme sakene. Det er en indikator, ikke en påvist forbindelse." : "Ingen koblinger mellom organisasjoner og steder de siste tre døgnene."}</p>
+      <ul>${links.map((k) => `<li><span><b>${esc(k.org)}</b> og <b>${esc(k.sted)}</b> · ${plural(k.antall, "sak", "saker")}</span><small>${artLink(k.saker[0])} · ${artMeta(k.saker[0])}</small></li>`).join("")}</ul>
+    </section>
+
+    <p class="brief-more"><button id="brief-full">Se full oversikt →</button>
+      <span>Kart, grafer, koblinger mellom kildene og kildelogg.</span></p>
+    <p class="brief-foot">Kilder: NRK, E24, VG, Teknisk Ukeblad, regjeringen.no, Kystverket AIS, Enhetsregisteret og Kartverket.
+      Alt er åpne data, og hvert oppslag logges med tidspunkt og fingeravtrykk.</p>`;
+  document.getElementById("brief-full").addEventListener("click", () => setMode("full"));
+}
+
+// Tabell med en liten stolpe i tallkolonnen
+const miniBar = (n, max) => `<span class="mini"><i style="width:${Math.max(4, (n / max) * 100)}%"></i></span><span class="num">${nf(n)}</span>`;
+
+function renderOrgTable(el, orgs) {
+  if (!orgs.length) { el.innerHTML = '<p class="hint">Ingen organisasjoner gjenkjent ennå.</p>'; return; }
+  const max = Math.max(...orgs.map((o) => o.antall));
+  el.innerHTML = `<table class="dtable"><thead><tr><th>Organisasjon</th><th>Saker</th><th>Enhetsregisteret</th><th>Nevnt sammen med</th></tr></thead><tbody>
+    ${orgs.map((o) => `<tr>
+      <td><b>${go(o.navn, `sok=${o.navn}`)}</b></td>
+      <td class="barcell">${miniBar(o.antall, max)}</td>
+      <td>${o.brreg ? `<a href="${brregUrl(o.brreg.orgnr)}" target="_blank" rel="noopener">${esc(o.brreg.orgnr)}</a> <span class="muted">${brregLine(o.brreg)}</span>` : '<span class="muted">Ikke entydig treff</span>'}</td>
+      <td>${o.steder.map((s) => `<span class="pillet">${esc(s)}</span>`).join("") || '<span class="muted">–</span>'}</td>
+    </tr>`).join("")}</tbody></table>`;
+}
+
+function renderCountries(el, land, noAis) {
+  if (!land.length) { el.innerHTML = '<p class="hint">Ingen andre land er nevnt i nyhetene siste 72 timer.</p>'; return; }
+  const max = Math.max(...land.map((l) => l.antall));
+  el.innerHTML = `<table class="dtable"><thead><tr><th>Land</th><th>Saker</th><th>Organisasjoner i de samme sakene</th><th>Fartøy under flagget nå</th><th>Siste sak</th></tr></thead><tbody>
+    ${land.map((l) => `<tr>
+      <td><b>${go(l.navn, `sok=${l.navn}`)}</b>${l.overvaket ? ' <span class="sev high">Overvåket flagg</span>' : ""}</td>
+      <td class="barcell">${miniBar(l.antall, max)}</td>
+      <td>${l.organisasjoner.map((o) => `<span class="pillet">${esc(o)}</span>`).join("") || '<span class="muted">–</span>'}</td>
+      <td class="num">${noAis ? '<span class="muted">–</span>' : l.fartoy ? go(nf(l.fartoy), `flagg=${l.navn}`) : '<span class="muted">0</span>'}</td>
+      <td class="last">${l.saker[0] ? `${artLink(l.saker[0])} <span class="muted">${artMeta(l.saker[0])}</span>` : ""}</td>
+    </tr>`).join("")}</tbody></table>`;
+}
+
+function renderLogTable(el, rows) {
+  if (!rows.length) { el.innerHTML = '<p class="hint">Ingen oppslag logget ennå.</p>'; return; }
+  const when = (iso) => new Date(iso).toLocaleString("no-NO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  el.innerHTML = `<table class="dtable"><thead><tr><th>Kilde</th><th>Oppslag</th><th>Sist hentet</th><th>Status</th><th>SHA-256</th></tr></thead><tbody>
+    ${rows.map((r) => `<tr><td>${esc(r.kilde)}</td><td class="num">${nf(r.oppslag)}</td><td>${esc(when(r.sist))}</td>
+      <td><span class="${r.status === 200 ? "ok" : "bad"}">${esc(r.status)}</span></td><td><code title="${esc(r.sha256)}">${esc((r.sha256 || "").slice(0, 16))}…</code></td></tr>`).join("")}</tbody></table>`;
+}
+
+// To kolonner med linjer mellom: organisasjoner til venstre, steder til høyre.
+// Linjetykkelsen er antall felles saker. Valget huskes mellom oppdateringer.
+let relSel = null, relData = null;
+function renderRelations(rel) {
+  relData = rel;
+  const el = document.getElementById("dash-rel");
+  if (!rel.koblinger.length) {
+    el.innerHTML = '<p class="hint">Ingen organisasjoner og steder er nevnt i samme sak siste 72 timer.</p>';
+    document.getElementById("dash-rel-detail").innerHTML = "";
+    return;
+  }
+  const col = (items, kind) => items.map((x) => `<li data-kind="${kind}" data-name="${esc(x.navn)}"><span title="${esc(x.navn)}">${esc(x.navn)}</span><small>${nf(x.antall)}</small></li>`).join("");
+  el.innerHTML = `<div class="rel">
+    <ul class="rel-col org"><li class="rel-h">Organisasjoner</li>${col(rel.organisasjoner, "org")}</ul>
+    <svg class="rel-lines" aria-hidden="true"></svg>
+    <ul class="rel-col sted"><li class="rel-h">Steder og land</li>${col(rel.steder, "sted")}</ul>
+  </div>`;
+  el.querySelectorAll("li[data-kind]").forEach((li) => {
+    li.addEventListener("click", () => selectRelation({ [li.dataset.kind]: li.dataset.name }));
+    li.addEventListener("mouseenter", () => highlightRelation({ [li.dataset.kind]: li.dataset.name }));
+    li.addEventListener("mouseleave", () => highlightRelation(relSel));
+  });
+  const valid = relSel && rel.koblinger.some((k) => relMatch(k, relSel));
+  if (!valid) relSel = { org: rel.koblinger[0].org, sted: rel.koblinger[0].sted };
+  drawRelationLines();
+  selectRelation(relSel);
+}
+const relMatch = (k, sel) => (!sel.org || k.org === sel.org) && (!sel.sted || k.sted === sel.sted);
+
+function drawRelationLines() {
+  const wrap = document.querySelector("#dash-rel .rel");
+  if (!wrap || !wrap.offsetWidth) return;
+  const box = wrap.getBoundingClientRect();
+  const svg = wrap.querySelector("svg");
+  svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+  const node = (kind, name) => [...wrap.querySelectorAll(`li[data-kind="${kind}"]`)].find((li) => li.dataset.name === name);
+  svg.innerHTML = relData.koblinger.map((k, i) => {
+    const l = node("org", k.org).getBoundingClientRect(), r = node("sted", k.sted).getBoundingClientRect();
+    const x0 = l.right - box.left + 4, y0 = l.top + l.height / 2 - box.top;
+    const x1 = r.left - box.left - 4, y1 = r.top + r.height / 2 - box.top;
+    const mid = (x0 + x1) / 2;
+    return `<path data-i="${i}" d="M ${x0} ${y0} C ${mid} ${y0}, ${mid} ${y1}, ${x1} ${y1}" stroke-width="${Math.min(1.5 + (k.antall - 1) * 1.5, 7)}"></path>`;
+  }).join("");
+  svg.querySelectorAll("path").forEach((p) => {
+    const k = relData.koblinger[p.dataset.i];
+    p.addEventListener("click", () => selectRelation({ org: k.org, sted: k.sted }));
+    p.addEventListener("mousemove", (e) => showTip(e, `<b>${esc(k.org)}</b> og <b>${esc(k.sted)}</b><br>${plural(k.antall, "felles sak", "felles saker")}`));
+    p.addEventListener("mouseleave", hideTip);
+  });
+  highlightRelation(relSel);
+}
+
+function highlightRelation(sel) {
+  const wrap = document.querySelector("#dash-rel .rel");
+  if (!wrap || !sel) return;
+  const on = relData.koblinger.filter((k) => relMatch(k, sel));
+  const orgs = new Set(on.map((k) => k.org)), steder = new Set(on.map((k) => k.sted));
+  wrap.querySelectorAll("path").forEach((p) => p.classList.toggle("on", relMatch(relData.koblinger[p.dataset.i], sel)));
+  wrap.querySelectorAll("li[data-kind]").forEach((li) => {
+    const hit = (li.dataset.kind === "org" ? orgs : steder).has(li.dataset.name);
+    li.classList.toggle("on", hit);
+    li.classList.toggle("dim", !hit);
+  });
+}
+
+function selectRelation(sel) {
+  relSel = sel;
+  highlightRelation(sel);
+  const on = relData.koblinger.filter((k) => relMatch(k, sel));
+  document.getElementById("dash-rel-title").textContent = sel.org && sel.sted
+    ? `${sel.org} og ${sel.sted}` : `Koblinger for ${sel.org || sel.sted}`;
+  document.getElementById("dash-rel-detail").innerHTML = on.map((k) => `
+    <div class="rel-group">
+      <h4><b>${go(k.org, `sok=${k.org}`)}</b> <span class="muted">nevnt sammen med</span> <b>${go(k.sted, `sok=${k.sted}`)}</b> <span class="muted">· ${plural(k.antall, "sak", "saker")}</span></h4>
+      <ul class="dash-list">${k.saker.map((s) => `<li><div>${artLink(s)}<br><small>${artMeta(s)}</small></div></li>`).join("")}</ul>
+    </div>`).join("") + '<p class="hint rel-note">En kobling betyr at navnene står i samme sak. Les sakene før du trekker en slutning.</p>';
+}
+new ResizeObserver(() => drawRelationLines()).observe(document.getElementById("dash-rel"));
+
+// Kart over stedene nyhetene handler om
+let dashNewsMap, dashNewsLayer;
+function renderNewsMap(points) {
+  if (!dashNewsMap) {
+    dashNewsMap = L.map("dash-newsmap", { zoomControl: false }).setView([65, 13], 4);
+    L.tileLayer("https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/{z}/{y}/{x}.png", {
+      attribution: "© Kartverket", className: "dark-tiles", maxZoom: 18,
+    }).addTo(dashNewsMap);
+    dashNewsLayer = L.layerGroup().addTo(dashNewsMap);
+  }
+  dashNewsMap.invalidateSize();
+  dashNewsLayer.clearLayers();
+  for (const p of [...points].sort((x, y) => y.antall - x.antall)) {
+    L.circleMarker([p.lat, p.lon], { radius: 4 + Math.sqrt(p.antall) * 3, color: "#0d1117", weight: 1, fillColor: "#7ee0c3", fillOpacity: 0.75 })
+      .bindPopup(`<b>${esc(p.navn)}</b> · ${plural(p.antall, "sak", "saker")}<br>${p.saker.map((s) => `${artLink(s)}<br><small>${artMeta(s)}</small>`).join("<br>")}`, { maxWidth: 280 })
+      .addTo(dashNewsLayer);
+  }
+}
+
+// ---------- Oversikt: innlasting og visningsvalg ----------
+let dashMode = "enkel";
+try { dashMode = localStorage.getItem("nordvakt-visning") === "full" ? "full" : "enkel"; } catch { /* privat modus */ }
+let lastDash = null;
+
+function setMode(mode) {
+  dashMode = mode;
+  try { localStorage.setItem("nordvakt-visning", mode); } catch { /* privat modus */ }
+  if (mode === "full") window.scrollTo(0, 0);
+  renderDashboard();
+}
+document.querySelectorAll(".mode button").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
+
+function renderDashboard() {
+  document.querySelectorAll(".mode button").forEach((b) => b.classList.toggle("active", b.dataset.mode === dashMode));
+  document.getElementById("brief").hidden = dashMode !== "enkel";
+  document.getElementById("full").hidden = dashMode !== "full";
+  if (!lastDash) return;
+  if (dashMode === "enkel") renderBrief(lastDash); else renderFull(lastDash);
+}
+
+function renderFull(d) {
+  const a = d.ais, n = d.nyheter, r = d.sammenhenger;
+  const noAis = aisMissing(d);
+  renderTiles(d);
+
+  // 1 Nyheter
+  newsColumns(document.getElementById("dash-news"), n.per_time, d.tid);
+  document.getElementById("dash-news-total").textContent = `${nf(n.per_time.reduce((s, x) => s + x, 0))} saker fra ${n.kilder.length} kilder`;
+  bars(document.getElementById("dash-keywords"), n.emneord.slice(0, 10).map((k) => ({ ...k, href: `sok=${k.navn}` })),
+    { unit: "saker", empty: "Ingen saker med emneord siste 7 døgn." });
+  listItems(document.getElementById("dash-hits"), n.siste_treff.map((t) => `
+    <li><div>${artLink(t)}<br><small>${artMeta(t)} · ${t.treff.map(esc).join(", ")}</small></div></li>`),
+    "Ingen saker med emneord siste 7 døgn.");
+  renderNewsMap(d.nyhetssteder);
+  bars(document.getElementById("dash-places"), n.topp.STED.map((o) => ({ navn: o.tekst, antall: o.antall, href: `sok=${o.tekst}` })), { unit: "saker, 72 t" });
+  bars(document.getElementById("dash-sources"), n.kilder, { unit: "saker, 72 t" });
+
+  // 2 Selskaper og organisasjoner
+  renderOrgTable(document.getElementById("dash-orgtable"), r.topp_organisasjoner);
+
+  // 3 Maritim
+  document.getElementById("dash-ais-source").textContent = STATIC
+    ? `AIS via ${d.øyeblikksbilde.ais_kilde || "Kystverket"} · siste kjente posisjoner i øyeblikksbildet`
+    : "Kystverket AIS · sanntid";
+  renderDashMap(a);
+  if (noAis) document.getElementById("dash-map").insertAdjacentHTML("beforeend", `<div class="map-note">${AIS_MISSING}</div>`);
+  bars(document.getElementById("dash-flags"),
+    a.flagg.filter((f) => f.navn !== "Norge").slice(0, 11).map((f) => ({ ...f, href: `flagg=${f.navn}` })), { unit: "fartøy", empty: noAis ? AIS_MISSING : undefined });
+  if (noAis) document.getElementById("dash-types").innerHTML = `<p class="hint">${AIS_MISSING}</p>`;
+  else donut(document.getElementById("dash-types"), a.kategorier);
+  bars(document.getElementById("dash-zones"), (noAis ? [] : a.soner).map((z) => ({
+    navn: z.navn, antall: z.naer, href: `e=zone:${z.id}`,
+    tip: `<b>${esc(z.navn)}</b><br>${z.inne} i sonen, ${z.naer} innen dobbel radius<br>${z.utenlandske} utenlandske`,
+  })), { unit: "fartøy", empty: noAis ? AIS_MISSING : undefined });
+  listItems(document.getElementById("dash-alerts"), a.siste_varsler.map((v) => `
+    <li data-href="e=vessel:${v.mmsi}"><span class="sev ${v.niva === "høy" ? "high" : "mid"}">${v.niva === "høy" ? "Høy" : "Middels"}</span>
+      <div><b>${esc(v.navn || `MMSI ${v.mmsi}`)}</b> · ${esc(v.flagg)}<br><small>${esc(v.sone)} · ${esc(fmtTime(v.tid))}</small></div></li>`),
+    "Ingen varsler siste døgn.");
+
+  // 4 Sammenhenger, og kildene bak
+  renderRelations(r);
+  renderCountries(document.getElementById("dash-countries"), r.land, noAis || !a.fartoy);
+  renderLogTable(document.getElementById("dash-log"), d.kildelogg);
+}
+
 let zonesCache = [];
 async function loadDashboard() {
   try {
     if (!zonesCache.length) zonesCache = await getJSON("/api/zones");
     const d = await getJSON("/api/dashboard");
-    const a = d.ais, n = d.nyheter;
-    renderTiles(d);
-    renderDashMap(a);
-    if (aisMissing(d)) {
-      document.getElementById("dash-map").insertAdjacentHTML("beforeend", `<div class="map-note">${AIS_MISSING}</div>`);
-    }
-    bars(document.getElementById("dash-flags"),
-      a.flagg.filter((f) => f.navn !== "Norge").slice(0, 11).map((f) => ({ ...f, href: `flagg=${f.navn}` })), { unit: "fartøy", empty: aisMissing(d) ? AIS_MISSING : undefined });
-    if (aisMissing(d)) document.getElementById("dash-types").innerHTML = `<p class="hint">${AIS_MISSING}</p>`;
-    else donut(document.getElementById("dash-types"), a.kategorier);
-    newsColumns(document.getElementById("dash-news"), n.per_time, d.tid);
-    document.getElementById("dash-news-total").textContent = `${nf(n.per_time.reduce((s, x) => s + x, 0))} saker fra ${n.kilder.length} kilder`;
-    bars(document.getElementById("dash-zones"), (aisMissing(d) ? [] : a.soner).map((z) => ({
-      navn: z.navn, antall: z.naer, href: `e=zone:${z.id}`,
-      tip: `<b>${esc(z.navn)}</b><br>${z.inne} i sonen, ${z.naer} innen dobbel radius<br>${z.utenlandske} utenlandske`,
-    })), { unit: "fartøy", empty: aisMissing(d) ? AIS_MISSING : undefined });
-    bars(document.getElementById("dash-keywords"), n.emneord.slice(0, 10).map((k) => ({ ...k, href: `sok=${k.navn}` })),
-      { unit: "saker", empty: "Ingen saker med emneord siste 7 døgn." });
-    bars(document.getElementById("dash-orgs"), n.topp.ORG.map((o) => ({ navn: o.tekst, antall: o.antall, href: `sok=${o.tekst}` })), { unit: "saker, 72 t" });
-    bars(document.getElementById("dash-places"), n.topp.STED.map((o) => ({ navn: o.tekst, antall: o.antall, href: `sok=${o.tekst}` })), { unit: "saker, 72 t" });
-    listItems(document.getElementById("dash-alerts"), a.siste_varsler.map((v) => `
-      <li data-href="e=vessel:${v.mmsi}"><span class="sev ${v.niva === "høy" ? "high" : "mid"}">${v.niva === "høy" ? "Høy" : "Middels"}</span>
-        <div><b>${esc(v.navn || `MMSI ${v.mmsi}`)}</b> · ${esc(v.flagg)}<br><small>${esc(v.sone)} · ${esc(fmtTime(v.tid))}</small></div></li>`),
-      "Ingen varsler siste døgn.");
-    listItems(document.getElementById("dash-hits"), n.siste_treff.map((t) => `
-      <li><div><a href="${esc(safeUrl(t.lenke))}" target="_blank" rel="noopener">${esc(t.tittel)}</a><br>
-        <small>${esc(t.kilde)} · ${esc(timeAgo(t.publisert))} · ${t.treff.map(esc).join(", ")}</small></div></li>`),
-      "Ingen saker med emneord siste 7 døgn.");
+    lastDash = d;
+    renderDashboard();
     const when = new Date(d.tid * 1000).toLocaleString("no-NO", { weekday: "long", hour: "2-digit", minute: "2-digit" });
     document.getElementById("dash-updated").textContent = STATIC
       ? `Øyeblikksbilde fra ${when} · nytt hver time`
-      : `Oppdatert ${fmtTime(d.tid)} · oppdateres hvert 30. sekund`;
+      : `Oppdatert ${fmtTime(d.tid)} · oppdateres hvert minutt`;
     if (STATIC) {
       const pill = document.getElementById("ais-status");
-      pill.textContent = aisMissing(d) ? "Øyeblikksbilde · uten AIS" : `Øyeblikksbilde · ${nf(a.fartoy)} fartøy`;
+      pill.textContent = aisMissing(d) ? "Øyeblikksbilde · uten AIS" : `Øyeblikksbilde · ${nf(d.ais.fartoy)} fartøy`;
       pill.classList.add("ok");
     }
   } catch (e) { console.error(e); }
 }
-setInterval(() => { if (dashVisible() && !STATIC) loadDashboard(); }, 30000);
+setInterval(() => { if (dashVisible() && !STATIC) loadDashboard(); }, 60000);
 
 route();

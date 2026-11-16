@@ -30,8 +30,8 @@ app = FastAPI(title="Nordvakt", lifespan=lifespan)
 # --- Oversikt ---
 
 @app.get("/api/dashboard")
-def dashboard_summary():
-    return dashboard.summary(store)
+async def dashboard_summary():
+    return await dashboard.summary(store)
 
 
 # --- Samlet søk og entiteter ---

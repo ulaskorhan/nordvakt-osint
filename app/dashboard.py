@@ -1,8 +1,9 @@
 """Oversiktssiden: et øyeblikksbilde på tvers av alle kildene."""
 
+import re
 import time
 
-from . import news
+from . import brreg, news, provenance
 from . import store as entity_store
 from .ais import AISStore, WATCH_FLAGS, haversine_km
 
@@ -50,6 +51,53 @@ def ais_summary(store: AISStore) -> dict:
     }
 
 
-def summary(store: AISStore) -> dict:
+# Navn i nyhetene som svarer til en annen flaggstat i AIS
+FLAG_ALIAS = {"England": "Storbritannia", "Skottland": "Storbritannia"}
+
+_org_cache: dict[str, tuple[float, dict | None]] = {}
+ORG_TTL = 6 * 3600
+
+
+def _norm(name: str) -> str:
+    return re.sub(r"\s+(asa|as|sa|sf|hf|rhf|kf|iks)$", "", name.strip().lower())
+
+
+async def org_facts(name: str) -> dict | None:
+    """Slår opp en organisasjon fra nyhetene i Enhetsregisteret. Bare entydige navnetreff
+    tas med: heller ingen kobling enn en feil kobling."""
+    hit = _org_cache.get(name)
+    if hit and time.time() - hit[0] < ORG_TTL:
+        return hit[1]
+    fact = None
+    try:
+        same = [e for e in await brreg.search(name)
+                if _norm(e["navn"] or "") == _norm(name) and not e["slettet"]]
+        if len(same) == 1:
+            e = same[0]
+            fact = {k: e[k] for k in ("orgnr", "navn", "form", "naering", "kommune", "ansatte")}
+    except Exception:
+        return None  # nettverksfeil mellomlagres ikke
+    _org_cache[name] = (time.time(), fact)
+    return fact
+
+
+async def relations(store: AISStore) -> dict:
+    """Nyheter koblet mot Enhetsregisteret (organisasjoner) og AIS (flaggstater)."""
+    rel = news.relations()
+    for o in rel["topp_organisasjoner"]:
+        o["brreg"] = await org_facts(o["navn"])
+    flags: dict[str, int] = {}
+    for v in store.vessels.values():
+        if v["lat"] is not None and v["flagg"] not in NOT_VESSELS:
+            flags[v["flagg"]] = flags.get(v["flagg"], 0) + 1
+    for land in rel["land"]:
+        flagg = FLAG_ALIAS.get(land["navn"], land["navn"])
+        land["fartoy"] = flags.get(flagg, 0)
+        land["overvaket"] = flagg in WATCH_FLAGS
+    return rel
+
+
+async def summary(store: AISStore) -> dict:
     return {"tid": time.time(), "ais": ais_summary(store), "nyheter": news.dashboard(),
-            "lager": entity_store.stats()}
+            "sammenhenger": await relations(store), "nyhetssteder": news.place_points(),
+            "kildelogg": provenance.summary(), "lager": entity_store.stats()}

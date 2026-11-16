@@ -44,6 +44,10 @@ COUNTRIES = {
     "Norge", "Sverige", "Danmark", "Finland", "Island", "Grønland", "Russland", "Ukraina",
     "Tyskland", "Frankrike", "Spania", "Polen", "Kina", "Japan", "Israel", "Iran", "Irland",
     "England", "Skottland", "Nederland", "Belgia", "Italia", "Hellas", "Tyrkia", "Canada",
+    "USA", "Storbritannia", "Estland", "Latvia", "Litauen", "Portugal", "Sveits", "Østerrike",
+    "India", "Sør-Korea", "Nord-Korea", "Taiwan", "Australia", "Brasil", "Mexico", "Egypt",
+    "Saudi-Arabia", "Qatar", "Syria", "Irak", "Libanon", "Palestina", "Afghanistan", "Pakistan",
+    "Belarus", "Georgia", "Ungarn", "Romania", "Bulgaria", "Serbia", "Tsjekkia", "Venezuela",
 }
 
 # Fylkene (inndeling fra 2024) finnes ikke i stedsnavnregisteret under dagens navn.
@@ -96,15 +100,20 @@ def _extract(articles: list[dict]) -> dict[str, set[tuple[str, str]]]:
     nlp = _load_nlp()
     texts = [f"{a['tittel']}. {a['sammendrag']}" for a in articles]
     out = {}
+    persons = set()  # holdes bare i minnet mens bunken behandles
     for a, doc in zip(articles, nlp.pipe(texts)):
         ents = set()
         for e in doc.ents:
             t = ENTITY_TYPES.get(e.label_)
             name = e.text.strip(" «»\"'.,:;()-–")
+            if e.label_ == "PER":
+                persons.add(name)
             if t and len(name) > 1 and not name.islower():
                 ents.add((name, t))
         out[a["id"]] = ents
-    return out
+    # Modellen merker av og til et personnavn som organisasjon. Navn den har kjent igjen
+    # som person et annet sted i samme bunke, lagres derfor ikke.
+    return {aid: {(n, t) for n, t in ents if n not in persons} for aid, ents in out.items()}
 
 
 def _keyword_hits(text: str) -> list[str]:
@@ -419,7 +428,19 @@ def status() -> dict:
 
 
 # Mediehus og byråer nevnes i nesten hver sak («NRK erfarer», «melder NTB») og sier lite.
-MEDIA = {"NRK", "VG", "E24", "TU", "Teknisk Ukeblad", "NTB", "Reuters", "AFP", "AP", "Bloomberg", "Dagbladet", "Aftenposten"}
+MEDIA = {
+    "NRK", "VG", "E24", "TU", "Teknisk Ukeblad", "NTB", "Reuters", "AFP", "AP", "Bloomberg", "Dagbladet",
+    "Aftenposten", "Dagens Næringsliv", "DN", "TV 2", "TV2", "Nettavisen", "Klassekampen", "Finansavisen",
+    "New York Times", "The New York Times", "Financial Times", "Wall Street Journal", "Washington Post",
+    "The Information", "The Guardian", "Fox News", "BBC", "BA", "BT", "Bergens Tidende", "Adresseavisen",
+    "Stavanger Aftenblad", "Nordlys", "iTromsø", "Avisa Nordland", "Fædrelandsvennen", "CNN", "Politico", "Der Spiegel", "Sky News", "Axios",
+}
+
+# Ord språkmodellen ofte tar for en organisasjon eller et sted, men som oftest er noe annet
+# (Brann er som regel en brann, ikke fotballklubben).
+NOISE = {"Brann", "Wall Street", "Norge", "Norden", "Europa", "Vesten"}
+ALIAS = {"Ap": "Arbeiderpartiet", "Frp": "Fremskrittspartiet", "Sp": "Senterpartiet", "SV": "Sosialistisk Venstreparti",
+         "KrF": "Kristelig Folkeparti", "MDG": "Miljøpartiet De Grønne", "De forente nasjoner": "FN"}
 
 
 def dashboard() -> dict:
@@ -460,3 +481,116 @@ def dashboard() -> dict:
         "topp": {t: [e for e in rows if e["tekst"] not in MEDIA][:8]
                  for t, rows in top_entities(hours=72, limit=14).items()},
     }
+
+
+MIN_MENTIONS = 2
+
+
+def relations(hours: int = 72, per_side: int = 10) -> dict:
+    """Sammenhenger i nyhetene: hvilke organisasjoner og steder nevnes i de samme sakene.
+
+    Samforekomst er en indikator, ikke en påvist forbindelse. Hver kobling viser derfor
+    sakene den bygger på, slik at den kan etterprøves.
+    """
+    since = time.time() - hours * 3600
+    with _lock:
+        rows = _db.execute(
+            """SELECT a.id, a.tittel, a.lenke, a.kilde, a.publisert, e.tekst, e.type
+               FROM enheter e JOIN artikler a ON a.id = e.artikkel_id
+               WHERE e.type IN ('ORG', 'STED') AND a.publisert > ?
+               ORDER BY a.publisert DESC""",
+            (since,),
+        ).fetchall()
+        coords = {r[0]: (r[1], r[2]) for r in _db.execute("SELECT navn, lat, lon FROM steder WHERE funnet = 1")}
+    known = {r[5] for r in rows}
+
+    def canon(tekst: str, typ: str) -> str | None:
+        # Genitiv slås sammen med grunnformen: «Nvidias» → «Nvidia», «Frankrikes» → «Frankrike»
+        if tekst.endswith("s") and len(tekst) > 2:
+            base = tekst[:-1]
+            if base in known or base in COUNTRIES or base.isupper():
+                tekst = base
+        tekst = ALIAS.get(tekst, tekst)
+        if tekst in NOISE or (typ == "ORG" and (tekst in MEDIA or len(tekst.split()) > 4)):
+            return None
+        # «Kryms russisk-støttede guvernør» er en omtale av en person, ikke en organisasjon
+        if typ == "ORG" and re.search(r"(guvernør|minister|president|sjef|leder|direktør|ordfører)$", tekst):
+            return None
+        # Steder må kunne plasseres: land, fylke eller treff i stedsnavnregisteret
+        if typ == "STED" and not (tekst in COUNTRIES or tekst in FYLKER or tekst in coords):
+            return None
+        return tekst
+
+    arts: dict[str, dict] = {}
+    for aid, tittel, lenke, kilde, pub, tekst, typ in rows:
+        tekst = canon(tekst, typ)
+        if tekst is None:
+            continue
+        a = arts.setdefault(aid, {"sak": {"tittel": tittel, "lenke": lenke, "kilde": kilde, "publisert": pub},
+                                  "ORG": set(), "STED": set()})
+        a[typ].add(tekst)
+
+    pairs: dict[tuple[str, str], list[dict]] = {}
+    org_n: dict[str, int] = {}
+    sted_n: dict[str, int] = {}
+    for a in arts.values():
+        for o in a["ORG"]:
+            org_n[o] = org_n.get(o, 0) + 1
+        for s in a["STED"]:
+            sted_n[s] = sted_n.get(s, 0) + 1
+        for o in a["ORG"]:
+            for s in a["STED"]:
+                pairs.setdefault((o, s), []).append(a["sak"])
+
+    # De sterkeste koblingene bestemmer hvem som får plass i figuren
+    # Navn som bare forekommer i én sak er oftest feilgjenkjenninger (også personnavn merket
+    # som organisasjon). De holdes utenfor koblingene.
+    pairs = {(o, s): v for (o, s), v in pairs.items() if org_n[o] >= MIN_MENTIONS}
+    ranked = sorted(pairs.items(), key=lambda kv: (-len(kv[1]), -kv[1][0]["publisert"]))
+    orgs: list[str] = []
+    steder: list[str] = []
+    for (o, s), _ in ranked:
+        if o not in orgs and len(orgs) < per_side:
+            orgs.append(o)
+        if s not in steder and len(steder) < per_side:
+            steder.append(s)
+    koblinger = [{"org": o, "sted": s, "antall": len(saker), "saker": saker[:4]}
+                 for (o, s), saker in ranked if o in orgs and s in steder]
+
+    land = []
+    for navn in sorted((s for s in sted_n if s in COUNTRIES and s != "Norge"), key=lambda s: -sted_n[s])[:10]:
+        med: dict[str, int] = {}
+        saker = []
+        for a in arts.values():
+            if navn in a["STED"]:
+                saker.append(a["sak"])
+                for o in a["ORG"]:
+                    if org_n[o] >= MIN_MENTIONS:
+                        med[o] = med.get(o, 0) + 1
+        land.append({"navn": navn, "antall": sted_n[navn], "saker": saker[:4],
+                     "organisasjoner": [o for o, _ in sorted(med.items(), key=lambda kv: -kv[1])[:4]]})
+
+    def org_row(o: str) -> dict:
+        med = sorted(((s, len(v)) for (oo, s), v in pairs.items() if oo == o), key=lambda kv: -kv[1])
+        return {"navn": o, "antall": org_n[o], "steder": [s for s, _ in med[:4]]}
+
+    def sted_row(s: str) -> dict:
+        lat, lon = coords.get(s) or FYLKER.get(s) or (None, None)
+        return {"navn": s, "antall": sted_n[s], "land": s in COUNTRIES, "lat": lat, "lon": lon}
+
+    topp_org = [o for o in sorted(org_n, key=lambda o: -org_n[o]) if org_n[o] >= MIN_MENTIONS][:8]
+    return {
+        "timer": hours,
+        "saker_med_kobling": sum(1 for a in arts.values() if a["ORG"] and a["STED"]),
+        "organisasjoner": [org_row(o) for o in orgs],
+        "steder": [sted_row(s) for s in steder],
+        "koblinger": koblinger,
+        "land": land,
+        "topp_organisasjoner": [org_row(o) for o in topp_org],
+    }
+
+
+def place_points(hours: int = 72) -> list[dict]:
+    """Stedfestede saker til kartet på oversikten (kortversjon av places())."""
+    return [{"navn": p["navn"], "lat": p["lat"], "lon": p["lon"], "antall": p["antall"], "saker": p["saker"][:3]}
+            for p in places(hours)]

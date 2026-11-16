@@ -39,7 +39,7 @@ async def collect(seconds: int) -> tuple[ais.AISStore, str]:
 
 async def main(seconds: int, out: Path) -> None:
     store, source = await collect(seconds)
-    data = dashboard.summary(store)
+    data = await dashboard.summary(store)
     data["øyeblikksbilde"] = {"ais_sekunder": seconds, "meldinger": store.messages,
                               "ais_tilgjengelig": store.messages > 0, "ais_kilde": source}
     out.mkdir(parents=True, exist_ok=True)

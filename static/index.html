@@ -130,7 +130,7 @@
               <div class="card-body method">
                 <dl>
                   <dt>Innhenting</dt><dd>Bare åpne kilder: RSS fra redaktørstyrte medier og regjeringen.no, AIS fra Kystverket, Enhetsregisteret og Kartverket. Ingen innlogging, ingen skraping bak betalingsmur.</dd>
-                  <dt>Gjenkjenning</dt><dd>En norsk språkmodell (spaCy, <code>nb_core_news_md</code>) finner organisasjoner og steder i titler og ingresser. Personnavn forkastes og lagres ikke.</dd>
+                  <dt>Gjenkjenning</dt><dd>En norsk språkmodell (spaCy, <code>nb_core_news_md</code>) finner organisasjoner og steder i titler og ingresser. Personnavn forkastes og lagres ikke. Navn modellen har kjent igjen som person, sperres med en hash, slik at de heller ikke slipper gjennom som organisasjon.</dd>
                   <dt>Stedfesting</dt><dd>Stedsnavn slås opp i Kartverkets stedsnavnregister. Navn som ikke kan plasseres, holdes utenfor kart og koblinger.</dd>
                   <dt>Registerkobling</dt><dd>Organisasjonsnavn slås opp i Enhetsregisteret. Bare entydige navnetreff tas med: heller ingen kobling enn en feil kobling.</dd>
                   <dt>Sammenhenger</dt><dd>En kobling betyr at to navn står i samme sak. Det er en indikator som må vurderes av et menneske, ikke en påvist forbindelse. Organisasjoner må være nevnt i minst to saker for å tas med. Sakene bak hver kobling vises alltid.</dd>

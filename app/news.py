@@ -75,6 +75,7 @@ _db.executescript(
     CREATE TABLE IF NOT EXISTS steder (
         navn TEXT PRIMARY KEY, funnet INTEGER, lat REAL, lon REAL, type TEXT, kommune TEXT
     );
+    CREATE TABLE IF NOT EXISTS personsperre (hash TEXT PRIMARY KEY);
     """
 )
 
@@ -96,24 +97,57 @@ def _clean(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _name_hash(name: str) -> str:
+    return hashlib.sha256(name.lower().encode()).hexdigest()
+
+
+def _block_persons(names: set[str]) -> None:
+    """Navn modellen har kjent igjen som person skal aldri lagres som enhet. Selve navnet
+    lagres ikke: bare en hash, slik at samme navn kan holdes ute når modellen senere tar
+    feil og kaller det en organisasjon. Rader som allerede er lagret, slettes."""
+    if not names:
+        return
+    with _lock:
+        _db.executemany("INSERT OR IGNORE INTO personsperre VALUES (?)", [(_name_hash(n),) for n in names])
+        _db.executemany("DELETE FROM enheter WHERE tekst = ? AND type != 'STED'", [(n,) for n in names])
+        _db.commit()
+
+
 def _extract(articles: list[dict]) -> dict[str, set[tuple[str, str]]]:
     nlp = _load_nlp()
     texts = [f"{a['tittel']}. {a['sammendrag']}" for a in articles]
     out = {}
-    persons = set()  # holdes bare i minnet mens bunken behandles
+    persons = set()
     for a, doc in zip(articles, nlp.pipe(texts)):
         ents = set()
         for e in doc.ents:
             t = ENTITY_TYPES.get(e.label_)
             name = e.text.strip(" «»\"'.,:;()-–")
-            if e.label_ == "PER":
+            if e.label_ == "PER" and len(name) > 1:
                 persons.add(name)
             if t and len(name) > 1 and not name.islower():
                 ents.add((name, t))
         out[a["id"]] = ents
-    # Modellen merker av og til et personnavn som organisasjon. Navn den har kjent igjen
-    # som person et annet sted i samme bunke, lagres derfor ikke.
-    return {aid: {(n, t) for n, t in ents if n not in persons} for aid, ents in out.items()}
+    _block_persons(persons)
+    with _lock:
+        blocked = {r[0] for r in _db.execute("SELECT hash FROM personsperre")}
+    return {aid: {(n, t) for n, t in ents if t == "STED" or _name_hash(n) not in blocked}
+            for aid, ents in out.items()}
+
+
+def scrub_persons(days: int = 7) -> int:
+    """Går gjennom lagrede saker på nytt og fjerner personnavn som har sluppet gjennom
+    som organisasjon. Kjøres ved oppstart og før hvert øyeblikksbilde."""
+    with _lock:
+        rows = _db.execute("SELECT tittel, sammendrag FROM artikler WHERE publisert > ?",
+                           (time.time() - days * 86400,)).fetchall()
+        before = _db.execute("SELECT COUNT(*) FROM enheter").fetchone()[0]
+    persons = set()
+    for doc in _load_nlp().pipe(f"{t}. {s}" for t, s in rows):
+        persons.update(n for e in doc.ents if e.label_ == "PER" and len(n := e.text.strip(" «»\"'.,:;()-–")) > 1)
+    _block_persons(persons)
+    with _lock:
+        return before - _db.execute("SELECT COUNT(*) FROM enheter").fetchone()[0]
 
 
 def _keyword_hits(text: str) -> list[str]:
@@ -228,6 +262,10 @@ async def fetch_all() -> int:
 
 async def run() -> None:
     interval = CONFIG["intervall_min"] * 60
+    try:
+        log.info("Personsperre: %d enheter fjernet", await asyncio.to_thread(scrub_persons))
+    except Exception:
+        log.exception("Personsperre feilet")
     while True:
         try:
             n = await fetch_all()

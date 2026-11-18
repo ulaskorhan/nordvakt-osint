@@ -101,6 +101,40 @@ def _name_hash(name: str) -> str:
     return hashlib.sha256(name.lower().encode()).hexdigest()
 
 
+_STRIP = " «»\"'.,:;()-–"
+
+# Ord som står foran et personnavn: «president Zelenskyj», «statsminister Støre»
+TITLES = {
+    "president", "presidenten", "statsminister", "statsministeren", "minister", "ministeren",
+    "utenriksminister", "forsvarsminister", "justisminister", "finansminister", "helseminister",
+    "kansler", "statsråd", "statsråden", "ordfører", "ordføreren", "sjef", "sjefen", "leder",
+    "lederen", "direktør", "direktøren", "generalsekretær", "konsernsjef", "styreleder",
+    "partileder", "visepresident", "senator", "kong", "kongen", "dronning", "prins", "prinsesse",
+    "biskop", "pave", "paven", "trener", "treneren", "spiller", "spissen", "keeper", "artist",
+    "forfatter", "sanger", "skuespiller", "advokat", "professor", "dommer", "aktor", "statsadvokat",
+}
+
+
+def _persons_in(doc) -> set[str]:
+    """Personnavn i en tekst, slik modellen og enkle regler ser dem:
+    - alt modellen merker som person, og etternavnet når hele navnet er brukt
+      («Volodymyr Zelenskyj» sperrer også «Zelenskyj», som ofte står alene senere)
+    - navn som står rett etter en tittel, uansett hva modellen kalte dem"""
+    out = set()
+    for e in doc.ents:
+        name = e.text.strip(_STRIP)
+        if len(name) < 2:
+            continue
+        if e.label_ == "PER":
+            out.add(name)
+            parts = name.split()
+            if len(parts) > 1 and len(parts[-1]) > 2:
+                out.add(parts[-1])
+        elif e.label_ != "LOC" and e.start > 0 and doc[e.start - 1].text.lower() in TITLES:
+            out.add(name)
+    return out
+
+
 def _block_persons(names: set[str]) -> None:
     """Navn modellen har kjent igjen som person skal aldri lagres som enhet. Selve navnet
     lagres ikke: bare en hash, slik at samme navn kan holdes ute når modellen senere tar
@@ -120,11 +154,10 @@ def _extract(articles: list[dict]) -> dict[str, set[tuple[str, str]]]:
     persons = set()
     for a, doc in zip(articles, nlp.pipe(texts)):
         ents = set()
+        persons |= _persons_in(doc)
         for e in doc.ents:
             t = ENTITY_TYPES.get(e.label_)
-            name = e.text.strip(" «»\"'.,:;()-–")
-            if e.label_ == "PER" and len(name) > 1:
-                persons.add(name)
+            name = e.text.strip(_STRIP)
             if t and len(name) > 1 and not name.islower():
                 ents.add((name, t))
         out[a["id"]] = ents
@@ -135,7 +168,7 @@ def _extract(articles: list[dict]) -> dict[str, set[tuple[str, str]]]:
             for aid, ents in out.items()}
 
 
-def scrub_persons(days: int = 7) -> int:
+def scrub_persons(days: int = 30) -> int:
     """Går gjennom lagrede saker på nytt og fjerner personnavn som har sluppet gjennom
     som organisasjon. Kjøres ved oppstart og før hvert øyeblikksbilde."""
     with _lock:
@@ -144,7 +177,7 @@ def scrub_persons(days: int = 7) -> int:
         before = _db.execute("SELECT COUNT(*) FROM enheter").fetchone()[0]
     persons = set()
     for doc in _load_nlp().pipe(f"{t}. {s}" for t, s in rows):
-        persons.update(n for e in doc.ents if e.label_ == "PER" and len(n := e.text.strip(" «»\"'.,:;()-–")) > 1)
+        persons |= _persons_in(doc)
     _block_persons(persons)
     with _lock:
         return before - _db.execute("SELECT COUNT(*) FROM enheter").fetchone()[0]

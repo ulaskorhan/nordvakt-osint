@@ -49,7 +49,7 @@ h1 { font-size: clamp(38px, 7vw, 64px); line-height: 1.05; letter-spacing: -0.02
 .button:hover { filter: brightness(1.1); }
 .button.ghost { background: none; color: var(--text); border-color: var(--border); }
 .button.ghost:hover { border-color: var(--muted); filter: none; }
-.static-note { color: var(--muted); font-size: 13px; margin: 18px 0 0; }
+.static-note { color: var(--muted); font-size: 12px; margin: 0; flex-basis: 100%; order: 3; }
 
 .now { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); padding: 24px; }
 .now-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }

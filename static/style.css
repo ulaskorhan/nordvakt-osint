@@ -208,10 +208,11 @@ a.chip { text-decoration: none; display: inline-block; }
 /* ---------- Oversikt ---------- */
 .static-note { display: none; }
 .static .static-note {
-  display: block; margin: 0 0 12px; padding: 10px 14px; border: 1px solid #2a5a6e; border-radius: 8px;
-  background: rgba(227, 168, 63, 0.09); font-size: 13px; color: var(--text);
+  display: block; margin: 40px 0 8px; padding: 16px 0 0; border-top: 1px solid var(--border);
+  font-size: 12px; line-height: 1.6; color: var(--muted); text-align: center;
 }
-.static-note a { color: var(--accent); }
+.static-note a { color: var(--text); text-decoration: none; border-bottom: 1px solid var(--border); }
+.static-note a:hover { color: var(--accent); }
 .static nav .tab:not([data-view="oversikt"]):not([data-view="trender"]) { display: none; }
 #view-oversikt.view.active { display: block; overflow-y: auto; }
 .dash { padding: 16px; max-width: 1600px; margin: 0 auto; }

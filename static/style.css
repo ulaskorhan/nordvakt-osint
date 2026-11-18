@@ -377,6 +377,10 @@ a.chip { text-decoration: none; display: inline-block; }
 .rel-group h4 a { color: var(--text); }
 .rel-note { margin-top: 10px; }
 
+.kw-back { margin: 0 0 6px; padding: 4px 10px; font-size: 12px; }
+.kw-sum { margin: 2px 0 6px; }
+#dash-keywords .dash-list { padding: 0; }
+
 /* ---------- Trender ---------- */
 #view-trender.view.active { display: block; overflow-y: auto; }
 .trend-intro { max-width: 760px; color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0 0 6px; }

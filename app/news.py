@@ -525,6 +525,7 @@ def dashboard() -> dict:
     per_time = [0] * 72
     kilder: dict[str, int] = {}
     emneord: dict[str, int] = {}
+    emneord_saker: dict[str, list[dict]] = {}
     siste_treff = []
     siste_24 = forrige_24 = treff_24 = 0
     for aid, kilde, tittel, lenke, pub, sammendrag in rows:
@@ -532,6 +533,9 @@ def dashboard() -> dict:
         treff = _keyword_hits(f"{tittel} {sammendrag}")
         for k in treff:
             emneord[k] = emneord.get(k, 0) + 1
+            saker = emneord_saker.setdefault(k, [])
+            if len(saker) < 30:
+                saker.append({"tittel": tittel, "lenke": lenke, "kilde": kilde, "publisert": pub})
         if age_h < 72:
             per_time[71 - int(max(age_h, 0))] += 1
             kilder[kilde] = kilder.get(kilde, 0) + 1
@@ -549,6 +553,7 @@ def dashboard() -> dict:
         "kilder": sorted(({"navn": k, "antall": n} for k, n in kilder.items()), key=lambda x: -x["antall"]),
         "emneord": sorted(({"navn": k, "antall": n} for k, n in emneord.items()), key=lambda x: -x["antall"]),
         "siste_treff": siste_treff,
+        "emneord_saker": emneord_saker,
         "topp": {t: [e for e in rows if e["tekst"] not in MEDIA][:8]
                  for t, rows in top_entities(hours=72, limit=14).items()},
     }

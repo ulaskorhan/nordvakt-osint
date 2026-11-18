@@ -1059,6 +1059,45 @@ const brregLine = (b) => [b.form, b.naering, b.kommune && `${b.kommune[0]}${b.ko
   b.ansatte ? `${nf(b.ansatte)} ansatte` : null].filter(Boolean).map(esc).join(" · ");
 const brregUrl = (orgnr) => `https://virksomhet.brreg.no/nb/oppslag/enheter/${encodeURIComponent(orgnr)}`;
 
+// «Dagens etterretningstreff»: fem funn der to eller flere kilder møtes, hvert med kildene bak.
+// Ordtrendene hentes ved behov; uten dem fylles listen fra oversiktsdataene alene.
+let briefTrends = null, briefTrendsLoading = false;
+function topMatches(d) {
+  if (!briefTrends && trendState.data) briefTrends = trendState.data;
+  if (!briefTrends && !briefTrendsLoading) {
+    briefTrendsLoading = true;
+    getJSON("/api/trends").then((t) => { briefTrends = t; if (dashMode === "enkel" && lastDash) renderBrief(lastDash); }).catch(() => {});
+  }
+  const n = d.nyheter, r = d.sammenhenger, a = d.ais;
+  const b = (x) => `<b>${esc(x)}</b>`;
+  const gen = (x) => (/s$/i.test(x) ? `${x}'` : `${x}s`);
+  const out = [];
+
+  // 1 Ord som nevnes langt oftere enn vanlig
+  if (briefTrends) {
+    const names = Object.fromEntries(briefTrends.ord.map((o) => [o.id, o.navn]));
+    const m = briefTrends.siste_7.ord.filter((o) => o.antall >= 5 && o.faktor >= 1.5 && o.tittel).sort((x, y) => y.faktor - x.faktor)[0];
+    if (m) out.push({ tag: "Trend", text: `${b(m.navn)} nevnes ${times(m.faktor)} oftere enn vanlig siste sju dager (${plural(m.antall, "sak", "saker")})${m.sammen_med.length ? `, oftest sammen med ${m.sammen_med.slice(0, 2).map((k) => b(names[k])).join(" og ")}` : ""}.`, refs: [m.tittel] });
+  }
+  // 2 Organisasjon og sted i de samme sakene
+  const k = r.koblinger.find((x) => x.antall >= 2) || r.koblinger[0];
+  if (k) out.push({ tag: "Kobling", text: `${b(k.org)} og ${b(k.sted)} står i de samme sakene ${plural(k.antall, "gang", "ganger")} siste tre døgn.`, refs: k.saker.slice(0, 2) });
+  // 3 Land i nyhetene og fartøy under samme flagg i farvannet
+  const l = (r.land || []).filter((x) => x.fartoy > 0 && x.saker?.length).sort((x, y) => (y.overvaket - x.overvaket) || (y.antall - x.antall))[0];
+  if (l && !aisMissing(d)) out.push({ tag: "Nyheter × AIS", text: `${b(l.navn)} nevnes i ${plural(l.antall, "sak", "saker")} siste 72 timer, og ${plural(l.fartoy, "fartøy", "fartøy")} under ${esc(gen(l.navn))} flagg er langs kysten nå.`,
+    refs: [l.saker[0], { tittel: "Kystverket AIS, posisjoner akkurat nå" }] });
+  // 4 Mest omtalte organisasjon, slått opp i Enhetsregisteret
+  const o = r.topp_organisasjoner.find((x) => x.brreg);
+  if (o) out.push({ tag: "Register", text: `${b(o.navn)} er nevnt i ${plural(o.antall, "sak", "saker")}. Enhetsregisteret: ${brregLine(o.brreg)}${o.steder.length ? `. Nevnt sammen med ${o.steder.slice(0, 3).map(esc).join(", ")}` : ""}.`,
+    refs: [{ tittel: `Enhetsregisteret, org.nr. ${o.brreg.orgnr}`, lenke: brregUrl(o.brreg.orgnr), kilde: "Brønnøysundregistrene" }] });
+  // 5 Siste sak om et sikkerhetsemne, eller fartøy nær en overvåkingssone
+  const h = n.siste_treff[0];
+  if (h) out.push({ tag: "Emneord", text: `Siste sak om ${h.treff.map(b).join(" og ")}.`, refs: [h] });
+  const z = a.soner?.filter((x) => x.naer).sort((x, y) => y.naer - x.naer)[0];
+  if (out.length < 5 && z && !aisMissing(d)) out.push({ tag: "AIS", text: `${plural(z.naer, "fartøy er", "fartøy er")} nær ${b(z.navn)} akkurat nå.`, refs: [{ tittel: "Kystverket AIS" }] });
+  return out.slice(0, 5);
+}
+
 // Enkel visning: én setning om situasjonen, og fire tema å velge mellom.
 let briefTopic = null;
 function renderBrief(d) {
@@ -1098,9 +1137,15 @@ function renderBrief(d) {
       <ul>${links.map((k) => `<li><span><b>${esc(k.org)}</b> og <b>${esc(k.sted)}</b> · ${plural(k.antall, "sak", "saker")}</span><small>${artLink(k.saker[0])} · ${artMeta(k.saker[0])}</small></li>`).join("")}</ul>` },
   ];
   const open = topics.find((t) => t.id === briefTopic);
+  const matches = topMatches(d);
 
   document.getElementById("brief").innerHTML = `
     <p class="brief-lead">${esc(lead)}</p>
+    ${matches.length ? `<section class="matches">
+      <div class="matches-head"><h2>Dagens etterretningstreff</h2><span>Der flere åpne kilder peker mot det samme</span></div>
+      <ol>${matches.map((m) => `<li><span class="m-tag">${esc(m.tag)}</span><div><p>${m.text}</p>
+        <small>${m.refs.map((r) => r.lenke ? `<a href="${esc(safeUrl(r.lenke))}" target="_blank" rel="noopener">${esc(r.tittel)}</a> · ${esc(r.kilde)}${r.publisert ? `, ${esc(timeAgo(r.publisert))}` : ""}` : esc(r.tittel)).join("<br>")}</small></div></li>`).join("")}</ol>
+    </section>` : ""}
     <div class="topics" role="tablist" aria-label="Tema">
       ${topics.map((t, i) => `
         <button class="topic${t.id === briefTopic ? " on" : ""}" role="tab" aria-selected="${t.id === briefTopic}" data-topic="${t.id}">

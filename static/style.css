@@ -388,7 +388,7 @@ a.chip { text-decoration: none; display: inline-block; }
 
 .kw-back { margin: 0 0 6px; padding: 4px 10px; font-size: 12px; }
 .kw-sum { margin: 2px 0 6px; }
-#dash-keywords .dash-list { padding: 0; }
+#dash-keywords .dash-list, #dash-places .dash-list { padding: 0; }
 
 /* ---------- Trender ---------- */
 #view-trender.view.active { display: block; overflow-y: auto; }

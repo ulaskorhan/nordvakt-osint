@@ -48,7 +48,26 @@ COUNTRIES = {
     "India", "Sør-Korea", "Nord-Korea", "Taiwan", "Australia", "Brasil", "Mexico", "Egypt",
     "Saudi-Arabia", "Qatar", "Syria", "Irak", "Libanon", "Palestina", "Afghanistan", "Pakistan",
     "Belarus", "Georgia", "Ungarn", "Romania", "Bulgaria", "Serbia", "Tsjekkia", "Venezuela",
+    "Sudan", "Somalia", "Etiopia", "Nigeria", "Sør-Afrika", "Kenya", "Uganda", "Rwanda", "Kongo", "Mali",
+    "Niger", "Libya", "Marokko", "Algerie", "Tunisia", "Jemen", "Jordan", "Kuwait", "Bahrain", "Oman",
+    "De forente arabiske emirater", "Armenia", "Aserbajdsjan", "Kasakhstan", "Moldova", "Slovakia",
+    "Slovenia", "Kroatia", "Bosnia", "Albania", "Kosovo", "Montenegro", "Nord-Makedonia", "Luxembourg",
+    "Argentina", "Chile", "Colombia", "Cuba", "Haiti", "Peru", "Vietnam", "Thailand", "Indonesia",
+    "Filippinene", "Malaysia", "Singapore", "Myanmar", "Bangladesh", "Sri Lanka", "Nepal", "New Zealand",
 }
+
+# Navn i nyhetene som betyr et land, men skrives annerledes
+COUNTRY_ALIAS = {"England": "Storbritannia", "Skottland": "Storbritannia", "Wales": "Storbritannia",
+                 "Gaza": "Palestina", "Vestbredden": "Palestina", "USAs": "USA", "EU-landene": None}
+
+
+def country_of(name: str) -> str | None:
+    """Landet et stedsnavn viser til, med genitiv slått sammen («Russlands» → «Russland»)."""
+    if name in COUNTRY_ALIAS:
+        return COUNTRY_ALIAS[name]
+    if name.endswith("s") and name[:-1] in COUNTRIES:
+        name = name[:-1]
+    return name if name in COUNTRIES else None
 
 # Fylkene (inndeling fra 2024) finnes ikke i stedsnavnregisteret under dagens navn.
 # Omtrentlige midtpunkter.
@@ -547,7 +566,35 @@ def dashboard() -> dict:
         if treff and len(siste_treff) < 8:
             siste_treff.append({"id": aid, "kilde": kilde, "tittel": tittel, "lenke": lenke,
                                 "publisert": pub, "treff": treff})
+    # Land i sakene siste 72 timer. Norge holdes utenfor: det er norske nyheter.
+    with _lock:
+        place_rows = _db.execute(
+            """SELECT DISTINCT a.id, e.tekst, a.tittel, a.lenke, a.kilde, a.publisert FROM enheter e
+               JOIN artikler a ON a.id = e.artikkel_id
+               WHERE e.type = 'STED' AND a.publisert > ? ORDER BY a.publisert DESC""",
+            (now - 72 * 3600,),
+        ).fetchall()
+    land_ids: dict[str, set[str]] = {}
+    land_saker: dict[str, list[dict]] = {}
+    seen_titles: dict[str, set[str]] = {}
+    for aid, tekst, tittel, lenke, kilde, pub in place_rows:
+        land = country_of(tekst)
+        if not land or land == "Norge" or aid in land_ids.setdefault(land, set()):
+            continue
+        land_ids[land].add(aid)
+        # Samme sak i flere feeder vises én gang i listen
+        key = tittel.strip().lower()
+        if key in seen_titles.setdefault(land, set()):
+            continue
+        seen_titles[land].add(key)
+        saker = land_saker.setdefault(land, [])
+        if len(saker) < 30:
+            saker.append({"tittel": tittel, "lenke": lenke, "kilde": kilde, "publisert": pub})
+    land_list = sorted(({"navn": k, "antall": len(v)} for k, v in seen_titles.items()), key=lambda x: -x["antall"])[:10]
+
     return {
+        "land": land_list,
+        "land_saker": {x["navn"]: land_saker[x["navn"]] for x in land_list},
         "siste_24": siste_24, "forrige_24": forrige_24, "treff_24": treff_24,
         "per_time": per_time,
         "kilder": sorted(({"navn": k, "antall": n} for k, n in kilder.items()), key=lambda x: -x["antall"]),

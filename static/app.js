@@ -1270,35 +1270,53 @@ function renderDashboard() {
   if (dashMode === "enkel") renderBrief(lastDash); else renderFull(lastDash);
 }
 
-// Emneord-kortet: klikk et ord for å se sakene bak tallet, i samme kort.
+// Stolpekort der hver stolpe kan klikkes for å se sakene bak tallet, i samme kort.
 // Virker også i den statiske demoen, siden sakene ligger i dashboard.json.
-let keywordOpen = null;
-function renderKeywords(n) {
-  const el = document.getElementById("dash-keywords");
-  const head = el.closest(".card").querySelector(".card-head h3");
-  const saker = n.emneord_saker || {};
-  if (keywordOpen && saker[keywordOpen]) {
-    const list = saker[keywordOpen];
-    const total = n.emneord.find((k) => k.navn === keywordOpen)?.antall || list.length;
-    head.textContent = `«${keywordOpen}», siste 7 døgn`;
+const storyCardOpen = {};
+function storyBars(id, { title, rows, stories, back, detailTitle, empty, sub }) {
+  const el = document.getElementById(id);
+  const head = el.closest(".card").querySelector(".card-head");
+  const h3 = head.querySelector("h3"), hint = head.querySelector(".hint");
+  const open = storyCardOpen[id];
+  const redraw = () => storyBars(id, { title, rows, stories, back, detailTitle, empty, sub });
+  if (open && stories[open]) {
+    const list = stories[open];
+    const total = rows.find((k) => k.navn === open)?.antall || list.length;
+    h3.textContent = detailTitle(open);
+    if (hint) hint.hidden = true;
     el.classList.remove("bars");
-    el.innerHTML = `<button class="secondary kw-back">← Alle emneord</button>
-      <p class="hint kw-sum">${plural(total, "sak", "saker")} nevner ordet${total > list.length ? `, de ${list.length} siste vises` : ""}.</p>
+    el.innerHTML = `<button class="secondary kw-back">← ${esc(back)}</button>
+      <p class="hint kw-sum">${plural(total, "sak", "saker")}${total > list.length ? `, de ${list.length} siste vises` : ""}.</p>
       <ul class="dash-list">${list.map((t) => `<li><div>${artLink(t)}<br><small>${artMeta(t)}</small></div></li>`).join("")}</ul>`;
-    el.querySelector(".kw-back").addEventListener("click", () => { keywordOpen = null; renderKeywords(n); });
+    el.querySelector(".kw-back").addEventListener("click", () => { delete storyCardOpen[id]; redraw(); });
     el.scrollTop = 0;
     return;
   }
-  keywordOpen = null;
-  head.textContent = "Emneord, siste 7 døgn";
+  delete storyCardOpen[id];
+  h3.textContent = title;
+  if (hint) hint.hidden = false;
   el.classList.add("bars");
-  const rows = n.emneord.slice(0, 10);
-  bars(el, rows.map((k) => ({ ...k, tip: `<b>${esc(k.navn)}</b><br>${plural(k.antall, "sak", "saker")}<br>Klikk for å se sakene` })),
-    { unit: "saker", empty: "Ingen saker med emneord siste 7 døgn." });
+  bars(el, rows.map((k) => ({ ...k, tip: `<b>${esc(k.navn)}</b><br>${plural(k.antall, "sak", "saker")}${sub ? ` ${sub}` : ""}<br>Klikk for å se sakene` })),
+    { unit: "saker", empty });
   el.querySelectorAll(".bar-row").forEach((row, i) => {
-    if (!saker[rows[i].navn]) return;
+    if (!stories[rows[i].navn]) return;
     row.classList.add("link");
-    row.addEventListener("click", () => { hideTip(); keywordOpen = rows[i].navn; renderKeywords(n); });
+    row.addEventListener("click", () => { hideTip(); storyCardOpen[id] = rows[i].navn; redraw(); });
+  });
+}
+
+function renderKeywords(n) {
+  storyBars("dash-keywords", {
+    title: "Emneord, siste 7 døgn", rows: n.emneord.slice(0, 10), stories: n.emneord_saker || {},
+    back: "Alle emneord", detailTitle: (k) => `«${k}», siste 7 døgn`, empty: "Ingen saker med emneord siste 7 døgn.",
+  });
+}
+
+function renderCountries7(n) {
+  storyBars("dash-places", {
+    title: "Mest omtalte land i norske nyheter", rows: n.land || [], stories: n.land_saker || {},
+    back: "Alle land", detailTitle: (k) => `${k} i norske nyheter, 72 t`, sub: "siste 72 timer",
+    empty: "Ingen andre land er nevnt siste 72 timer.",
   });
 }
 
@@ -1315,7 +1333,7 @@ function renderFull(d) {
     <li><div>${artLink(t)}<br><small>${artMeta(t)} · ${t.treff.map(esc).join(", ")}</small></div></li>`),
     "Ingen saker med emneord siste 7 døgn.");
   renderNewsMap(d.nyhetssteder);
-  bars(document.getElementById("dash-places"), n.topp.STED.map((o) => ({ navn: o.tekst, antall: o.antall, href: `sok=${o.tekst}` })), { unit: "saker, 72 t" });
+  renderCountries7(n);
   bars(document.getElementById("dash-sources"), n.kilder, { unit: "saker, 72 t" });
 
   // 2 Selskaper og organisasjoner

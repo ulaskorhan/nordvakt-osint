@@ -36,7 +36,7 @@ header {
   border-bottom: 1px solid var(--border);
   background: var(--panel);
 }
-.brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: 0.12em; color: var(--text); text-decoration: none; }
+.brand { white-space: nowrap; display: inline-flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: 0.12em; color: var(--text); text-decoration: none; }
 .brand img { display: block; flex: none; }
 .brand span { font-weight: 400; letter-spacing: 0; color: var(--muted); margin-left: 6px; }
 nav { display: flex; gap: 4px; }
@@ -464,7 +464,12 @@ a.chip { text-decoration: none; display: inline-block; }
 .pairs li:hover { background: rgba(227, 168, 63, 0.09); }
 .pairs .pv { color: var(--muted); font-variant-numeric: tabular-nums; }
 .pairs .pl { text-align: right; font-variant-numeric: tabular-nums; }
-.pair-sum { margin: 0 0 8px; font-size: 13px; }
+.pair-sum { margin: 0 0 10px; font-size: 13px; }
+.pair-weeks { display: flex; align-items: flex-end; gap: 2px; height: 46px; padding-bottom: 1px; border-bottom: 1px solid var(--border); }
+.pair-weeks i { flex: 1; background: var(--accent); border-radius: 2px 2px 0 0; min-width: 2px; }
+.pair-weeks i.gap { background: rgba(47, 76, 85, 0.35); height: 100% !important; border-radius: 0; }
+.pair-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin: 4px 0 12px; font-family: var(--mono); }
+.pair-list { max-height: 420px; overflow-y: auto; padding: 0; }
 
 .spikes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .spike { border: 1px solid var(--border); border-radius: 8px; background: var(--panel); padding: 14px; font-size: 13px; }

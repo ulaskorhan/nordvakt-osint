@@ -1580,10 +1580,22 @@ function showPair(a, b) {
   if (trendState.pair) {
     const p = d.par.find((x) => (x.a === a && x.b === b) || (x.a === b && x.b === a));
     title.textContent = `${termName(a)} + ${termName(b)}`;
-    el.innerHTML = `<p class="pair-sum">${plural(p.antall, "felles sak", "felles saker")} · ${times(p.lift)} så ofte som om ordene var uavhengige</p>
-      ${p.titler ? `<ul class="dash-list">${p.titler.map((t) => `<li><div>${artLink(t)}<br><small>${artMeta(t)}</small></div></li>`).join("")}</ul>`
-        : `<p class="hint">Eksempelsaker vises for de tolv sterkeste parene.${STATIC ? "" : ` Søk etter ${go(termName(a), `sok=${termName(a)} ${termName(b)}`)} for å lese dem.`}</p>`}
-      <button class="secondary" id="pair-back">← Alle sterke par</button>`;
+    const list = (p.saker || []).map((i) => d.par_saker[i]).filter(Boolean);
+    const shown = list.length ? list : (p.titler || []);
+    // Når ordene har stått sammen: felles saker per uke, grå der arkivet ikke dekker uken
+    const weeks = p.uker || [];
+    const wmax = Math.max(...weeks, 1);
+    const strip = weeks.length ? `<div class="pair-weeks" aria-label="Felles saker per uke">${weeks.map((v, i) => `<i class="${d.dekket[i] || v ? "" : "gap"}"
+        style="height:${v ? Math.max(12, (v / wmax) * 100) : 0}%" data-tip="Uke ${weekNo(d.uker[i])}<br>${plural(v, "felles sak", "felles saker")}"></i>`).join("")}</div>
+      <div class="pair-axis"><span>Uke ${weekNo(d.uker[0])}</span><span>Felles saker per uke</span><span>Uke ${weekNo(d.uker[d.uker.length - 1])}</span></div>` : "";
+    el.innerHTML = `<button class="secondary kw-back" id="pair-back">← Alle sterke par</button>
+      <p class="pair-sum">${plural(p.antall, "felles sak", "felles saker")} · ${times(p.lift)} så ofte som om ordene var uavhengige</p>
+      ${strip}
+      ${shown.length ? `<p class="hint kw-sum">${shown.length < p.antall ? `De ${shown.length} siste sakene der begge ordene nevnes:` : "Sakene der begge ordene nevnes:"}</p>
+        <ul class="dash-list pair-list">${shown.map((t) => `<li><div>${artLink(t)}<br><small>${artMeta(t)}</small></div></li>`).join("")}</ul>`
+        : `<p class="hint">Sakene er eldre enn arkivet som følger med øyeblikksbildet.</p>`}`;
+    wireInteractive(el);
+    if (el.getBoundingClientRect().top > innerHeight * 0.8 || el.getBoundingClientRect().top < 0) el.closest(".card").scrollIntoView({ behavior: "smooth", block: "start" });
     document.getElementById("pair-back").addEventListener("click", () => showPair());
     return;
   }

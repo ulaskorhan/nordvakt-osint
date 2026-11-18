@@ -24,6 +24,7 @@ CONFIG = json.loads((Path(__file__).resolve().parent.parent / "data" / "trends.j
 OSLO = ZoneInfo("Europe/Oslo")
 WEEKS = CONFIG["uker"]
 TITLES_PER_WEEK = 3
+PAIR_STORIES = 20  # saker som vises per ordpar
 
 TERMS = [
     {"id": o["id"], "navn": o["navn"], "gruppe": g["navn"],
@@ -158,6 +159,29 @@ def analyse(weeks: list[dict], now: float | None = None) -> dict:
     for p in pairs[:12]:
         p["titler"] = _pair_titles(since, p["a"], p["b"])
 
+    # Sakene bak hvert par, så alle rutene i matrisen kan klikkes. Hver sak lagres én
+    # gang i «saker», og parene peker dit; ellers ville samme sak gå igjen i mange par.
+    stories, index = [], {}
+    by_pair: dict[str, list[int]] = {}
+    for art in _articles(since):  # nyeste først
+        hits = art["ord"]
+        if len(hits) < 2:
+            continue
+        for i, x in enumerate(hits):
+            for y in hits[i + 1:]:
+                lst = by_pair.setdefault(f"{x}|{y}", [])
+                if len(lst) >= PAIR_STORIES:
+                    continue
+                key = art["lenke"]
+                if key not in index:
+                    index[key] = len(stories)
+                    stories.append(_title(art))
+                lst.append(index[key])
+    for p in pairs:
+        p["saker"] = by_pair.get(f"{p['a']}|{p['b']}") or by_pair.get(f"{p['b']}|{p['a']}") or []
+        key, rev = f"{p['a']}|{p['b']}", f"{p['b']}|{p['a']}"
+        p["uker"] = [w["par"].get(key, 0) + w["par"].get(rev, 0) for w in weeks]
+
     # Utslag: ordets andel minst dobbelt så høy som snittet for de fire foregående dekkede ukene
     spikes = []
     for s in series:
@@ -182,7 +206,7 @@ def analyse(weeks: list[dict], now: float | None = None) -> dict:
     return {
         "tid": now, "uker": [w["start"] for w in weeks], "saker": [w["saker"] for w in weeks],
         "dekket": covered, "dekning_fra": first, "grupper": [g["navn"] for g in CONFIG["grupper"]],
-        "ord": series, "par": pairs, "utslag": spikes[:12], "siste_7": last_days(now), "daglig": daily(now),
+        "ord": series, "par": pairs, "par_saker": stories, "utslag": spikes[:12], "siste_7": last_days(now), "daglig": daily(now),
         "kilder": len(news.CONFIG["kilder"]),
     }
 

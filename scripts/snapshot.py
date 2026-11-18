@@ -10,10 +10,11 @@ BARENTSWATCH_CLIENT_SECRET er satt, ellers ved å lytte på Kystverkets TCP-str�
 import argparse
 import asyncio
 import json
+import os
 import logging
 from pathlib import Path
 
-from app import ais, barentswatch, dashboard, news
+from app import ais, barentswatch, dashboard, news, trends
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -37,6 +38,22 @@ async def collect(seconds: int) -> tuple[ais.AISStore, str]:
     return store, "Kystverket TCP"
 
 
+def previous_weeks() -> list[dict] | None:
+    """Ukene fra forrige publiserte øyeblikksbilde. Nyhetsarkivet ligger i en
+    GitHub-cache som kan forsvinne; da tas historikken vare på herfra."""
+    url = os.environ.get("NORDVAKT_FORRIGE")
+    if not url:
+        return None
+    try:
+        import httpx
+        resp = httpx.get(url, timeout=20, follow_redirects=True)
+        resp.raise_for_status()
+        return resp.json().get("rå")
+    except Exception as exc:
+        logging.warning("Fant ikke forrige trendfil (%s): %s", url, exc)
+        return None
+
+
 async def main(seconds: int, out: Path) -> None:
     store, source = await collect(seconds)
     logging.info("Personsperre: %d enheter fjernet", news.scrub_persons())
@@ -44,6 +61,9 @@ async def main(seconds: int, out: Path) -> None:
     data["øyeblikksbilde"] = {"ais_sekunder": seconds, "meldinger": store.messages,
                               "ais_tilgjengelig": store.messages > 0, "ais_kilde": source}
     out.mkdir(parents=True, exist_ok=True)
+    trend = trends.summary(previous_weeks())
+    (out / "trends.json").write_text(json.dumps(trend, ensure_ascii=False), encoding="utf-8")
+    logging.info("Trender: %d uker dekket, fra %s", sum(trend["dekket"]), trend["dekning_fra"])
     (out / "dashboard.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     (out / "zones.json").write_text(json.dumps(store.zones, ensure_ascii=False), encoding="utf-8")
     logging.info("Øyeblikksbilde: %d fartøy, %d AIS-meldinger, %d saker siste døgn",

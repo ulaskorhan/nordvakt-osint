@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nordvakt</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
-  <link rel="stylesheet" href="/static/style.css?v=17">
+  <link rel="stylesheet" href="/static/style.css?v=19">
 </head>
 <body>
   <header>
     <a class="brand" href="/">NORDVAKT <span>OSINT · Norge</span></a>
     <nav>
       <button class="tab active" data-view="oversikt">Oversikt</button>
+      <button class="tab" data-view="trender">Trender</button>
       <button class="tab" data-view="sok">Søk</button>
       <button class="tab" data-view="nyheter">Nyheter</button>
       <button class="tab" data-view="nettverk">Selskaper</button>
@@ -141,7 +142,64 @@
           </div>
         </div>
       </div>
-      <div id="dash-tip" class="dash-tip" hidden></div>
+    </section>
+
+    <section id="view-trender" class="view">
+      <div class="dash">
+        <div class="dash-head">
+          <div>
+            <h1>Ordtrender</h1>
+            <span id="trend-updated" class="hint"></span>
+          </div>
+        </div>
+        <p class="trend-intro">Hvilke ord brukes i norske nyheter, og hvilke ord står sammen? Nordvakt teller <span id="trend-n">24</span> ord i hver sak
+          fra åpne nyhetskilder, uke for uke. Brå endringer og ord som dukker opp i de samme sakene kan peke på en utvikling,
+          men sakene bak må alltid leses.</p>
+
+        <h2 class="sec">Siste sju dager <small>Mot de fire ukene før</small></h2>
+        <div id="trend-movers" class="movers"></div>
+
+        <h2 class="sec">Utvikling over tid</h2>
+        <div class="card auto">
+          <div class="card-head">
+            <h3 id="trend-chart-title">Andel av sakene som nevner ordet</h3>
+            <div class="seg">
+              <div class="mode" role="group" aria-label="Periode">
+                <button data-range="dager">30 dager</button><button data-range="uker">26 uker</button>
+              </div>
+              <div class="mode" role="group" aria-label="Mål">
+                <button data-measure="andel">Andel</button><button data-measure="antall">Antall</button>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="trend-picker" class="picker"></div>
+            <div id="trend-chart" class="trend-chart"></div>
+            <p id="trend-coverage" class="hint"></p>
+          </div>
+        </div>
+
+        <h2 class="sec">Ord som står sammen <small>Saker der begge ordene nevnes, hele perioden</small></h2>
+        <div class="dash-grid">
+          <div class="card span2 auto">
+            <div class="card-head"><h3>Samforekomst</h3><span class="hint">Mørkere = flere felles saker. Klikk en rute.</span></div>
+            <div id="trend-matrix" class="card-body"></div>
+          </div>
+          <div class="card span2 auto">
+            <div class="card-head"><h3 id="trend-pair-title">Sterkeste par</h3></div>
+            <div id="trend-pairs" class="card-body"></div>
+          </div>
+        </div>
+
+        <h2 class="sec">Utslag <small>Uker der et ord nevnes minst dobbelt så ofte som de foregående ukene</small></h2>
+        <div id="trend-spikes"></div>
+
+        <h2 class="sec">Alle ordene</h2>
+        <div class="card auto"><div id="trend-table" class="card-body"></div></div>
+        <p class="hint trend-foot">Metode: ordene matches mot tittel og ingress med faste mønstre (f.eks. «drone» treffer også «droneangrep»).
+          Samme sak i flere feeder telles én gang. «× vanlig» sammenligner andelen av sakene, slik at flere kilder ikke gir kunstig vekst.
+          Ordlisten ligger i <code>data/trends.json</code>.</p>
+      </div>
     </section>
 
     <section id="view-sok" class="view">
@@ -272,10 +330,11 @@
       </div>
     </section>
   </main>
+  <div id="dash-tip" class="dash-tip" hidden></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
-  <script src="/static/app.js?v=23"></script>
+  <script src="/static/app.js?v=26"></script>
 </body>
 </html>

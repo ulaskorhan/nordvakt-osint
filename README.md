@@ -27,6 +27,8 @@ Hver datakilde er en **connector** i `app/connectors/`. En connector kan søke, 
 
 **Sammenhenger.** Oversikten kobler kildene mot hverandre: organisasjoner og steder som nevnes i de samme sakene (med sakene bak hver kobling), organisasjonsnavn slått opp i Enhetsregisteret (bare entydige treff), og land i nyhetene ved siden av antall fartøy under samme flagg. En kobling er en indikator, ikke en påvist forbindelse. Organisasjoner må være nevnt i minst to saker for å tas med.
 
+**Trender.** Fanen «Trender» (`/api/trends`, `app/trends.py`) følger 24 ord i nyhetene over 26 uker, f.eks. Russland, Kina, KI, Nvidia, drone, cyberangrep og Trump. Ordlisten og mønstrene ligger i `data/trends.json`. Den viser andelen av sakene som nevner hvert ord (per dag med tre dagers snitt, eller per uke), hvilke ord som står i de samme sakene oftere enn tilfeldig, og utslag: uker der et ord brått nevnes minst dobbelt så ofte som før, med sakene bak. Grunnlaget er Nordvakts eget nyhetsarkiv, som startet i november 2026. Ukene før vises som ikke samlet til arkivet har vokst. I den statiske demoen tas ukeshistorikken vare på ved at hvert øyeblikksbilde fletter inn forrige publiserte `trends.json`.
+
 **Maritim.** Henter sanntids AIS fra Kystverkets åpne strøm (`153.44.253.27:5631`, NLOD) og viser fartøy på kart med flaggstat utledet fra MMSI. Appen varsler når:
 - `flagg_i_sone`: et fartøy med flagg på overvåkingslisten (`WATCH_FLAGS` i `app/ais.py`) går inn i en sone
 - `opphold`: et utenlandsk fartøy holder lav fart (< 1,5 kn) i over 20 minutter i en sone

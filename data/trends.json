@@ -1,0 +1,50 @@
+{
+  "_merknad": "Ord som følges over tid i nyhetene. Mønstrene er regulære uttrykk mot tittel og ingress. Store bokstaver betyr at mønsteret skiller mellom store og små bokstaver (forkortelser som KI og EU).",
+  "uker": 26,
+  "grupper": [
+    {
+      "navn": "Geopolitikk",
+      "ord": [
+        {"id": "russland", "navn": "Russland", "mønster": "\\b(russland|russisk|russer)"},
+        {"id": "ukraina", "navn": "Ukraina", "mønster": "\\b(ukraina|ukrainsk)"},
+        {"id": "kina", "navn": "Kina", "mønster": "\\b(kina|kinesisk|kineser)"},
+        {"id": "usa", "navn": "USA", "mønster": "\\bUSA\\b|\\bamerikansk", "store": true},
+        {"id": "trump", "navn": "Trump", "mønster": "\\btrump"},
+        {"id": "nato", "navn": "Nato", "mønster": "\\bnato\\b"},
+        {"id": "eu", "navn": "EU", "mønster": "\\bEU\\b|\\bEUs\\b", "store": true},
+        {"id": "iran", "navn": "Iran", "mønster": "\\b(iran|iransk)"}
+      ]
+    },
+    {
+      "navn": "Teknologi",
+      "ord": [
+        {"id": "ki", "navn": "KI", "mønster": "\\bKI\\b|\\bAI\\b|[Kk]unstig intelligens|\\bKI-|\\bAI-", "store": true},
+        {"id": "nvidia", "navn": "Nvidia", "mønster": "\\bnvidia"},
+        {"id": "brikker", "navn": "Brikker", "mønster": "\\bhalvleder|\\bbrikke|\\bmikrobrikke|\\bchip"},
+        {"id": "datasenter", "navn": "Datasentre", "mønster": "datasenter|datasentr"}
+      ]
+    },
+    {
+      "navn": "Sikkerhet",
+      "ord": [
+        {"id": "drone", "navn": "Drone", "mønster": "drone"},
+        {"id": "cyber", "navn": "Cyberangrep", "mønster": "cyberangrep|dataangrep|nettangrep|hackerangrep|\\bhacker|løsepengevirus|dataangrep"},
+        {"id": "sabotasje", "navn": "Sabotasje", "mønster": "sabot"},
+        {"id": "spionasje", "navn": "Spionasje", "mønster": "\\bspion|etterretning"},
+        {"id": "kabler", "navn": "Kabler og rør", "mønster": "sjøkabel|undersjøisk|kabelbrudd|rørledning|gassrør"},
+        {"id": "skyggeflate", "navn": "Skyggeflåten", "mønster": "skyggeflåte"},
+        {"id": "sanksjoner", "navn": "Sanksjoner", "mønster": "sanksjon"},
+        {"id": "beredskap", "navn": "Beredskap", "mønster": "beredskap"}
+      ]
+    },
+    {
+      "navn": "Energi og økonomi",
+      "ord": [
+        {"id": "olje", "navn": "Olje", "mønster": "\\bolje|oljepris|oljefond"},
+        {"id": "gass", "navn": "Gass", "mønster": "\\bgass(?!e)"},
+        {"id": "strom", "navn": "Strømpris", "mønster": "strømpris|strømregning|strømstøtte"},
+        {"id": "toll", "navn": "Toll", "mønster": "\\btoll(?!e)\\w*"}
+      ]
+    }
+  ]
+}

@@ -59,7 +59,9 @@ jobs:
         env:
           BARENTSWATCH_CLIENT_ID: ${{ secrets.BARENTSWATCH_CLIENT_ID }}
           BARENTSWATCH_CLIENT_SECRET: ${{ secrets.BARENTSWATCH_CLIENT_SECRET }}
-        run: python -m scripts.snapshot --ais-sekunder 240
+        run: |
+          export NORDVAKT_FORRIGE="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/data/trends.json"
+          python -m scripts.snapshot --ais-sekunder 240
 
       - name: Bygg nettsiden
         run: python -m scripts.build_site

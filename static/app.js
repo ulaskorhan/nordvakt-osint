@@ -3,7 +3,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 // Statisk modus (GitHub Pages): ingen server, bare et øyeblikksbilde av oversikten
 // som GitHub Actions lager hver time. Se scripts/snapshot.py.
 const STATIC = window.NORDVAKT_STATIC === true;
-const STATIC_FILES = { "/api/dashboard": "data/dashboard.json", "/api/zones": "data/zones.json" };
+const STATIC_FILES = { "/api/dashboard": "data/dashboard.json", "/api/zones": "data/zones.json", "/api/trends": "data/trends.json" };
 if (STATIC) document.body.classList.add("static");
 const getJSON = async (url) => {
   if (STATIC && !STATIC_FILES[url]) throw new Error(`Ikke tilgjengelig i statisk versjon: ${url}`);
@@ -24,6 +24,7 @@ function showView(view) {
   if (view === "kildelogg") loadLog();
   if (view === "nyheter") loadNews();
   if (view === "oversikt") loadDashboard();
+  if (view === "trender") loadTrends();
 }
 function goTo(view) {
   history.replaceState(null, "", `#${view}`);
@@ -653,7 +654,7 @@ const typeDot = (t) => `<i class="type-dot" style="background:${TYPES[t]?.farge 
 const trunc = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 function route() {
-  if (STATIC) { showView("oversikt"); return; }
+  if (STATIC) { showView(location.hash === "#trender" ? "trender" : "oversikt"); return; }
   const h = decodeURIComponent(location.hash.slice(1));
   if (h.startsWith("e=")) { showView("sok"); openEntity(h.slice(2)); }
   else if (h.startsWith("sok=")) { showView("sok"); runSearch(h.slice(4)); }
@@ -1333,5 +1334,277 @@ async function loadDashboard() {
   } catch (e) { console.error(e); }
 }
 setInterval(() => { if (dashVisible() && !STATIC) loadDashboard(); }, 60000);
+
+
+// ---------- Trender ----------
+// Ord i nyhetene over tid. Data fra /api/trends (app/trends.py).
+// Farger: kategoriske plasser fra dataviz-paletten (mørk modus), gitt til ordet når det
+// velges og beholdt så lenge det er valgt. Fargen følger ordet, ikke rekkefølgen.
+const SERIES_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181"];
+const TREND_DEFAULT = ["russland", "kina", "ki", "drone"];
+const trendState = { data: null, range: null, measure: "andel", picked: new Map(), pair: null };
+const pct = (v) => `${v.toLocaleString("no-NO", { maximumFractionDigits: 1 })} %`;
+const times = (f) => `${f.toLocaleString("no-NO", { maximumFractionDigits: 1 })}×`;
+const weekNo = (iso) => {
+  const d = new Date(`${iso}T12:00:00`);
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 864e5 + 1) / 7);
+};
+const dayLabel = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString("no-NO", { day: "numeric", month: "short" });
+const termName = (id) => trendState.data.ord.find((o) => o.id === id)?.navn || id;
+
+function pickTerm(id) {
+  const m = trendState.picked;
+  if (m.has(id)) { if (m.size > 1) m.delete(id); }
+  else if (m.size < SERIES_COLORS.length) {
+    const used = new Set(m.values());
+    m.set(id, SERIES_COLORS.find((c) => !used.has(c)));
+  }
+  renderTrendPicker();
+  renderTrendChart();
+}
+
+function renderTrendPicker() {
+  const d = trendState.data;
+  const el = document.getElementById("trend-picker");
+  el.innerHTML = d.grupper.map((g) => `<div class="pick-group"><span>${esc(g)}</span>${d.ord.filter((o) => o.gruppe === g).map((o) => {
+    const c = trendState.picked.get(o.id);
+    return `<button class="pick${c ? " on" : ""}" data-id="${o.id}" ${c ? `style="--c:${c}"` : ""} ${!c && trendState.picked.size >= SERIES_COLORS.length ? "disabled" : ""}>${c ? "<i></i>" : ""}${esc(o.navn)}</button>`;
+  }).join("")}</div>`).join("") + `<p class="hint pick-hint">Velg opptil ${SERIES_COLORS.length} ord.</p>`;
+  el.querySelectorAll(".pick").forEach((b) => b.addEventListener("click", () => pickTerm(b.dataset.id)));
+}
+
+// Linjediagram i SVG: én akse, tynne linjer, hull der arkivet ikke dekker perioden,
+// trådkors med verdiene for alle valgte ord.
+function renderTrendChart() {
+  const d = trendState.data, daily = trendState.range === "dager";
+  const el = document.getElementById("trend-chart");
+  const labels = daily ? d.daglig.dager : d.uker;
+  const covered = daily ? d.daglig.dekket : d.dekket;
+  const totals = daily ? d.daglig.saker : d.saker;
+  const valuesOf = (id) => {
+    const src = daily ? d.daglig.ord[id] : d.ord.find((o) => o.id === id);
+    return trendState.measure === "andel" ? src.andel : src.antall.map((n, i) => (covered[i] ? n : null));
+  };
+  const series = [...trendState.picked].map(([id, color]) => ({ id, color, navn: termName(id), v: valuesOf(id) }));
+  document.getElementById("trend-chart-title").textContent = trendState.measure === "andel"
+    ? (daily ? "Andel av sakene som nevner ordet, tre dagers snitt" : "Andel av ukens saker som nevner ordet")
+    : `Antall saker per ${daily ? "dag" : "uke"} som nevner ordet`;
+
+  const W = Math.max(el.clientWidth, 320), H = 300, m = { t: 14, r: series.length <= 4 ? 96 : 16, b: 28, l: 40 };
+  const n = labels.length, iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const max = Math.max(...series.flatMap((s) => s.v.filter((x) => x != null)), trendState.measure === "andel" ? 1 : 2);
+  const step = niceStep(max / 4);
+  const top = Math.ceil(max / step) * step;
+  const x = (i) => m.l + (n === 1 ? iw / 2 : (i / (n - 1)) * iw);
+  const y = (v) => m.t + ih - (v / top) * ih;
+  const fmtV = (v) => (trendState.measure === "andel" ? pct(v) : nf(v));
+
+  let grid = "";
+  for (let v = 0; v <= top + 1e-9; v += step) {
+    grid += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" class="g"/><text x="${m.l - 6}" y="${y(v) + 4}" class="ya">${trendState.measure === "andel" ? `${+v.toFixed(1)}%` : v}</text>`;
+  }
+  // Grå felt der arkivet ennå ikke dekker perioden
+  let gaps = "", start = null;
+  covered.forEach((c, i) => {
+    if (!c && start === null) start = i;
+    if ((c || i === n - 1) && start !== null) {
+      const end = c ? i - 1 : i;
+      const x0 = Math.max(m.l, x(start) - iw / (2 * (n - 1))), x1 = Math.min(W - m.r, x(end) + iw / (2 * (n - 1)));
+      gaps += `<rect x="${x0}" y="${m.t}" width="${x1 - x0}" height="${ih}" class="gap"/>`;
+      if (x1 - x0 > 110) gaps += `<text x="${(x0 + x1) / 2}" y="${m.t + ih / 2}" class="gap-t">Ikke samlet ennå</text>`;
+      start = null;
+    }
+  });
+  // Én etikett per ~80 px, talt bakfra slik at siste dag/uke alltid har etikett
+  const every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(iw / 80))));
+  const xt = labels.map((l, i) => ((n - 1 - i) % every === 0 ? `<text x="${x(i)}" y="${H - 8}" class="xa">${daily ? dayLabel(l) : `Uke ${weekNo(l)}`}</text>` : "")).join("");
+  const paths = series.map((s) => {
+    let dPath = "", pen = false;
+    s.v.forEach((v, i) => {
+      if (v == null) { pen = false; return; }
+      dPath += `${pen ? "L" : "M"}${x(i).toFixed(1)} ${y(v).toFixed(1)} `;
+      pen = true;
+    });
+    const dots = s.v.map((v, i) => (v != null && (s.v[i - 1] == null && s.v[i + 1] == null) ? `<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="${s.color}"/>` : "")).join("");
+    return `<path d="${dPath}" stroke="${s.color}" class="ln"/>${dots}`;
+  }).join("");
+  // Direkte etiketter ved siste verdi (bare når det er plass, maks fire serier)
+  let ends = "";
+  if (series.length <= 4) {
+    const placed = series.map((s) => {
+      const i = s.v.map((v, k) => (v == null ? -1 : k)).filter((k) => k >= 0).pop();
+      return i == null ? null : { s, yy: y(s.v[i]) };
+    }).filter(Boolean).sort((a, b) => a.yy - b.yy);
+    for (let k = 1; k < placed.length; k++) placed[k].yy = Math.max(placed[k].yy, placed[k - 1].yy + 14);
+    ends = placed.map((p) => `<text x="${W - m.r + 8}" y="${p.yy + 4}" class="endl"><tspan fill="${p.s.color}">●</tspan> ${esc(p.s.navn)}</text>`).join("");
+  }
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Linjediagram over ordbruk">
+    ${gaps}${grid}${xt}${paths}${ends}
+    <line class="cross" y1="${m.t}" y2="${m.t + ih}" visibility="hidden"/>
+    <g class="hover-dots"></g>
+    <rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" class="hit"/>
+  </svg>`;
+  const svg = el.querySelector("svg"), cross = svg.querySelector(".cross"), hd = svg.querySelector(".hover-dots");
+  svg.querySelector(".hit").addEventListener("mousemove", (e) => {
+    const r = svg.getBoundingClientRect();
+    const i = Math.max(0, Math.min(n - 1, Math.round(((e.clientX - r.left) * (W / r.width) - m.l) / (n === 1 ? 1 : iw / (n - 1)))));
+    cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("visibility", "visible");
+    hd.innerHTML = series.map((s) => (s.v[i] == null ? "" : `<circle cx="${x(i)}" cy="${y(s.v[i])}" r="4.5" fill="${s.color}" stroke="#151b23" stroke-width="2"/>`)).join("");
+    const head = daily ? new Date(`${labels[i]}T12:00:00`).toLocaleDateString("no-NO", { weekday: "long", day: "numeric", month: "long" }) : `Uke ${weekNo(labels[i])} (fra ${dayLabel(labels[i])})`;
+    const rows = covered[i]
+      ? [...series].sort((a, b) => (b.v[i] ?? -1) - (a.v[i] ?? -1)).map((s) => `<div class="tt-row"><i style="background:${s.color}"></i>${esc(s.navn)}<b>${fmtV(s.v[i] ?? 0)}</b></div>`).join("") + `<div class="tt-foot">${nf(totals[i])} saker totalt</div>`
+      : `<div class="tt-foot">Arkivet dekker ikke denne perioden ennå</div>`;
+    showTip(e, `<b>${esc(head)}</b>${rows}`);
+  });
+  svg.querySelector(".hit").addEventListener("mouseleave", () => { cross.setAttribute("visibility", "hidden"); hd.innerHTML = ""; hideTip(); });
+  const first = daily ? d.daglig.dager[d.daglig.dekket.indexOf(true)] : d.dekning_fra;
+  document.getElementById("trend-coverage").textContent = first
+    ? `Arkivet dekker fra ${new Date(`${first}T12:00:00`).toLocaleDateString("no-NO", { day: "numeric", month: "long", year: "numeric" })}. Grå felt fylles etter hvert som arkivet vokser.`
+    : "Arkivet har for få saker ennå.";
+}
+function niceStep(raw) {
+  const p = 10 ** Math.floor(Math.log10(raw || 1));
+  return [1, 2, 2.5, 5, 10].map((k) => k * p).find((s) => s >= raw) || p * 10;
+}
+
+function renderMovers(d) {
+  const rows = d.siste_7.ord.filter((o) => o.antall >= 5 && o.faktor != null).sort((a, b) => b.faktor - a.faktor).slice(0, 4);
+  const el = document.getElementById("trend-movers");
+  if (!rows.length) { el.innerHTML = '<p class="hint">For få saker siste sju dager til å si noe ennå.</p>'; return; }
+  el.innerHTML = rows.map((o) => `
+    <div class="mover">
+      <div class="mv-top"><span class="mv-name">${esc(o.navn)}</span><span class="mv-f ${o.faktor >= 2 ? "hot" : ""}">${times(o.faktor)} vanlig</span></div>
+      <div class="mv-n">${plural(o.antall, "sak", "saker")} <span class="muted">· ${pct(o.andel)} av alle</span></div>
+      ${o.sammen_med.length ? `<div class="mv-with">Oftest sammen med ${o.sammen_med.map((k) => `<b>${esc(termName(k))}</b>`).join(", ")}</div>` : ""}
+      ${o.tittel ? `<div class="mv-art">${artLink(o.tittel)}<small>${artMeta(o.tittel)}</small></div>` : ""}
+    </div>`).join("");
+}
+
+// Matrise: ord med treff, gruppert. Sekvensiell blåskala etter antall felles saker.
+const SEQ = ["#1f2a37", "#184f95", "#1c5cab", "#256abf", "#3987e5", "#5598e7", "#86b6ef"];
+function renderMatrix(d) {
+  const terms = d.ord.filter((o) => o.totalt > 0);
+  const n = new Map(d.par.map((p) => [`${p.a}|${p.b}`, p]));
+  const get = (a, b) => n.get(`${a}|${b}`) || n.get(`${b}|${a}`);
+  const max = Math.max(...d.par.map((p) => p.antall), 1);
+  const shade = (v) => (v ? SEQ[Math.min(SEQ.length - 1, 1 + Math.floor((Math.log(v) / Math.log(max + 1)) * (SEQ.length - 1)))] : "transparent");
+  const el = document.getElementById("trend-matrix");
+  el.innerHTML = `<div class="matrix" style="--n:${terms.length}">
+    <span></span>${terms.map((t) => `<span class="mh col" title="${esc(t.navn)}">${esc(t.navn)}</span>`).join("")}
+    ${terms.map((r, i) => `<span class="mh row">${esc(r.navn)}</span>${terms.map((c, j) => {
+      if (j >= i) return '<span class="mc empty"></span>';
+      const p = get(r.id, c.id);
+      return `<span class="mc${p ? " has" : ""}" style="background:${shade(p?.antall)}" data-a="${r.id}" data-b="${c.id}"
+        data-tip="<b>${esc(r.navn)} + ${esc(c.navn)}</b><br>${p ? `${plural(p.antall, "felles sak", "felles saker")}<br>${times(p.lift)} så ofte som tilfeldig` : "Ingen felles saker"}"></span>`;
+    }).join("")}`).join("")}
+  </div>
+  <div class="mx-legend"><span>Færre</span>${SEQ.slice(1).map((c) => `<i style="background:${c}"></i>`).join("")}<span>Flere felles saker</span></div>`;
+  el.querySelectorAll(".mc.has").forEach((c) => c.addEventListener("click", () => { hideTip(); showPair(c.dataset.a, c.dataset.b); }));
+  wireInteractive(el);
+}
+
+function showPair(a, b) {
+  const d = trendState.data;
+  trendState.pair = a && b ? [a, b] : null;
+  document.querySelectorAll("#trend-matrix .mc").forEach((c) => c.classList.toggle("sel", !!trendState.pair &&
+    ((c.dataset.a === a && c.dataset.b === b) || (c.dataset.a === b && c.dataset.b === a))));
+  const el = document.getElementById("trend-pairs");
+  const title = document.getElementById("trend-pair-title");
+  if (trendState.pair) {
+    const p = d.par.find((x) => (x.a === a && x.b === b) || (x.a === b && x.b === a));
+    title.textContent = `${termName(a)} + ${termName(b)}`;
+    el.innerHTML = `<p class="pair-sum">${plural(p.antall, "felles sak", "felles saker")} · ${times(p.lift)} så ofte som om ordene var uavhengige</p>
+      ${p.titler ? `<ul class="dash-list">${p.titler.map((t) => `<li><div>${artLink(t)}<br><small>${artMeta(t)}</small></div></li>`).join("")}</ul>`
+        : `<p class="hint">Eksempelsaker vises for de tolv sterkeste parene.${STATIC ? "" : ` Søk etter ${go(termName(a), `sok=${termName(a)} ${termName(b)}`)} for å lese dem.`}</p>`}
+      <button class="secondary" id="pair-back">← Alle sterke par</button>`;
+    document.getElementById("pair-back").addEventListener("click", () => showPair());
+    return;
+  }
+  title.textContent = "Sterkeste par";
+  const pairs = d.par.filter((p) => p.antall >= 3).slice(0, 10);
+  el.innerHTML = pairs.length ? `<ul class="pairs">${pairs.map((p) => `<li data-a="${p.a}" data-b="${p.b}">
+      <span class="pn">${esc(termName(p.a))} <span class="muted">+</span> ${esc(termName(p.b))}</span>
+      <span class="pv">${plural(p.antall, "sak", "saker")}</span><span class="pl">${times(p.lift)}</span></li>`).join("")}</ul>
+      <p class="hint">«×» = hvor mye oftere ordene står sammen enn om de var uavhengige. Klikk for sakene.</p>`
+    : '<p class="hint">Ingen par med minst tre felles saker ennå.</p>';
+  el.querySelectorAll("li[data-a]").forEach((li) => li.addEventListener("click", () => showPair(li.dataset.a, li.dataset.b)));
+}
+
+function renderSpikes(d) {
+  const el = document.getElementById("trend-spikes");
+  if (!d.utslag.length) {
+    el.innerHTML = `<div class="card auto"><div class="card-body"><p class="hint">Ingen utslag ennå. Et utslag krever minst to tidligere uker å sammenligne med,
+      og arkivet dekker ${d.dekket.filter(Boolean).length} uke(r) så langt. Til da viser «Siste sju dager» hva som nevnes mer enn vanlig.</p></div></div>`;
+    return;
+  }
+  el.innerHTML = `<div class="spikes">${d.utslag.map((x) => `<div class="spike">
+    <div class="sp-head"><b>${esc(termName(x.ord))}</b><span class="mv-f hot">${times(x.faktor)} vanlig</span></div>
+    <div class="muted">Uke ${weekNo(x.uke)} · ${plural(x.antall, "sak", "saker")}${x.sammen_med.length ? ` · sammen med ${x.sammen_med.map((s) => esc(termName(s.ord))).join(", ")}` : ""}</div>
+    <ul>${x.titler.map((t) => `<li>${artLink(t)}<small>${artMeta(t)}</small></li>`).join("")}</ul></div>`).join("")}</div>`;
+}
+
+function sparkline(vals, color = "#3987e5") {
+  const v = vals.map((x) => x ?? null), w = 120, h = 26;
+  const max = Math.max(...v.filter((x) => x != null), 0.01);
+  let p = "", pen = false;
+  v.forEach((x, i) => {
+    if (x == null) { pen = false; return; }
+    p += `${pen ? "L" : "M"}${((i / (v.length - 1)) * w).toFixed(1)} ${(h - 2 - (x / max) * (h - 4)).toFixed(1)} `;
+    pen = true;
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true"><path d="${p}" fill="none" stroke="${color}" stroke-width="1.5"/></svg>`;
+}
+
+function renderTrendTable(d) {
+  const recent = new Map(d.siste_7.ord.map((o) => [o.id, o]));
+  const rows = [...d.ord].sort((a, b) => (recent.get(b.id)?.antall || 0) - (recent.get(a.id)?.antall || 0));
+  document.getElementById("trend-table").innerHTML = `<table class="dtable"><thead><tr><th>Ord</th><th>Gruppe</th><th>Siste 30 dager</th><th>Siste 7 dager</th><th>× vanlig</th><th>Hele perioden</th></tr></thead><tbody>
+    ${rows.map((o) => { const r = recent.get(o.id); return `<tr class="tr-pick" data-id="${o.id}">
+      <td><b>${esc(o.navn)}</b></td><td class="muted">${esc(o.gruppe)}</td>
+      <td>${sparkline(d.daglig.ord[o.id].andel)}</td>
+      <td class="num">${nf(r?.antall || 0)}</td>
+      <td class="num">${r?.faktor != null && r.antall >= 3 ? `<span class="${r.faktor >= 2 ? "hot-t" : ""}">${times(r.faktor)}</span>` : '<span class="muted">–</span>'}</td>
+      <td class="num">${nf(o.totalt)}</td></tr>`; }).join("")}</tbody></table>
+    <p class="hint">Klikk et ord for å legge det til i diagrammet.</p>`;
+  document.querySelectorAll("#trend-table .tr-pick").forEach((tr) => tr.addEventListener("click", () => {
+    if (!trendState.picked.has(tr.dataset.id)) pickTerm(tr.dataset.id);
+    document.getElementById("trend-chart").scrollIntoView({ behavior: "smooth", block: "center" });
+  }));
+}
+
+function setTrendSeg() {
+  document.querySelectorAll("[data-range]").forEach((b) => b.classList.toggle("active", b.dataset.range === trendState.range));
+  document.querySelectorAll("[data-measure]").forEach((b) => b.classList.toggle("active", b.dataset.measure === trendState.measure));
+}
+document.querySelectorAll("[data-range]").forEach((b) => b.addEventListener("click", () => { trendState.range = b.dataset.range; setTrendSeg(); renderTrendChart(); }));
+document.querySelectorAll("[data-measure]").forEach((b) => b.addEventListener("click", () => { trendState.measure = b.dataset.measure; setTrendSeg(); renderTrendChart(); }));
+new ResizeObserver(() => { if (trendState.data && document.getElementById("view-trender").classList.contains("active")) renderTrendChart(); })
+  .observe(document.getElementById("trend-chart"));
+
+async function loadTrends() {
+  try {
+    const d = await getJSON("/api/trends");
+    trendState.data = d;
+    // Kort arkiv: start i dagsvisning, som har form allerede
+    if (!trendState.range) trendState.range = d.dekket.filter(Boolean).length >= 8 ? "uker" : "dager";
+    if (!trendState.picked.size) TREND_DEFAULT.filter((id) => d.ord.some((o) => o.id === id)).forEach((id, i) => trendState.picked.set(id, SERIES_COLORS[i]));
+    document.getElementById("trend-n").textContent = d.ord.length;
+    document.getElementById("trend-updated").textContent = `${plural(d.saker.reduce((s, x) => s + x, 0), "sak", "saker")} fra ${d.kilder} kilder · oppdatert ${new Date(d.tid * 1000).toLocaleString("no-NO", { weekday: "long", hour: "2-digit", minute: "2-digit" })}`;
+    if (STATIC) {
+      const pill = document.getElementById("ais-status");
+      if (!pill.classList.contains("ok")) { pill.textContent = "Øyeblikksbilde · nytt hver time"; pill.classList.add("ok"); }
+    }
+    setTrendSeg();
+    renderMovers(d);
+    renderTrendPicker();
+    renderTrendChart();
+    renderMatrix(d);
+    showPair(...(trendState.pair || []));
+    renderSpikes(d);
+    renderTrendTable(d);
+  } catch (e) { console.error(e); }
+}
 
 route();

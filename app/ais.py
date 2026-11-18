@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import math
+import re
 import time
 from collections import deque
 from pathlib import Path
@@ -56,7 +57,31 @@ MID = {
     "667": "Sierra Leone", "677": "Tanzania",
     "312": "Belize", "314": "Barbados", "325": "Jamaica", "341": "St. Kitts og Nevis",
     "375": "St. Vincent", "376": "St. Vincent", "377": "St. Vincent",
+    "201": "Albania", "203": "Østerrike", "204": "Portugal", "206": "Belarus", "207": "Bulgaria",
+    "213": "Georgia", "214": "Moldova", "216": "Armenia", "236": "Gibraltar", "238": "Kroatia",
+    "242": "Marokko", "243": "Ungarn", "253": "Luxembourg", "254": "Monaco", "255": "Portugal",
+    "262": "Montenegro", "264": "Romania", "267": "Slovakia", "269": "Sveits", "270": "Tsjekkia",
+    "274": "Nord-Makedonia", "278": "Slovenia", "279": "Serbia",
+    "303": "USA", "310": "Bermuda", "316": "Canada", "319": "Caymanøyene", "334": "Honduras",
+    "345": "Mexico", "378": "Britiske Jomfruøyer", "403": "Saudi-Arabia", "416": "Taiwan",
+    "419": "India", "470": "De forente arabiske emirater", "503": "Australia", "512": "New Zealand",
+    "518": "Cookøyene", "525": "Indonesia", "533": "Malaysia", "548": "Filippinene", "567": "Thailand",
+    "574": "Vietnam", "657": "Nigeria", "671": "Togo", "710": "Brasil", "725": "Chile",
 }
+
+# Landkoder (MID) tildeles av ITU i området 201–775. Andre tre første sifre betyr at
+# senderen ikke har en gyldig flaggstat; langs kysten er det oftest AIS-bøyer på
+# fiskeredskap, som bruker egne nummerserier (109…, 586…, 941… osv.).
+NO_FLAG = "Uten flaggstat"
+UNKNOWN_MID = "Ukjent landkode"
+GEAR = "Fiskeredskap"
+_GEAR_NAME = re.compile(r"B[OØ]U?Y|BOUY|BUOY|B[OØ]YE|\[\d{1,3}%\]", re.IGNORECASE)
+
+
+def is_gear(v: dict) -> bool:
+    """AIS-sender på fiskeredskap (garn-/linebøye) eller uten gyldig landkode: ikke et skip."""
+    return (v["flagg"] in (NO_FLAG, GEAR) or v["flagg"].startswith(UNKNOWN_MID)
+            or bool(_GEAR_NAME.search(v.get("navn") or "")))
 
 # Flaggstater som utløser varsel ved innseiling i en sone. Juster etter behov.
 WATCH_FLAGS = {"Russland", "Kamerun", "Gabon", "Komorene", "Sierra Leone", "Iran", "Nord-Korea"}
@@ -72,7 +97,9 @@ def flag_of(mmsi: int) -> str:
         return "SAR-luftfartøy"
     if s.startswith("97"):
         return "Nødsender"
-    return MID.get(s[:3], f"MID {s[:3]}")
+    if not 201 <= int(s[:3]) <= 775:
+        return NO_FLAG
+    return MID.get(s[:3], f"{UNKNOWN_MID} {s[:3]}")
 
 
 def ship_category(t: int | None) -> str:

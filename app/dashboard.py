@@ -5,7 +5,7 @@ import time
 
 from . import brreg, news, provenance
 from . import store as entity_store
-from .ais import AISStore, WATCH_FLAGS, haversine_km
+from .ais import AISStore, WATCH_FLAGS, haversine_km, is_gear
 
 # MMSI-er som ikke er skip (fyr, bøyer, kyststasjoner) holdes utenfor fartøystallene
 NOT_VESSELS = {"Navigasjonsinnretning", "Kyststasjon", "SAR-luftfartøy", "Nødsender"}
@@ -19,7 +19,9 @@ def _count(items) -> list[dict]:
 
 
 def ais_summary(store: AISStore) -> dict:
-    ships = [v for v in store.vessels.values() if v["lat"] is not None and v["flagg"] not in NOT_VESSELS]
+    placed = [v for v in store.vessels.values() if v["lat"] is not None and v["flagg"] not in NOT_VESSELS]
+    # Bøyer på fiskeredskap og sendere uten gyldig landkode er ikke skip
+    ships = [v for v in placed if not is_gear(v)]
     flags = _count(v["flagg"] for v in ships)
     soner = []
     for z in store.zones:
@@ -40,6 +42,7 @@ def ais_summary(store: AISStore) -> dict:
         "utenlandske": sum(v["flagg"] != "Norge" for v in ships),
         "overvaket_flagg": sum(v["flagg"] in WATCH_FLAGS for v in ships),
         "i_bevegelse": sum((v["fart"] or 0) >= 1 for v in ships),
+        "uten_flagg": len(placed) - len(ships),
         "flagg": flags[:12],
         "antall_flagg": len(flags),
         "kategorier": _count(v["kategori"] for v in ships),

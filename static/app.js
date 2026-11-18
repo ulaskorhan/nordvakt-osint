@@ -1059,7 +1059,8 @@ const brregLine = (b) => [b.form, b.naering, b.kommune && `${b.kommune[0]}${b.ko
   b.ansatte ? `${nf(b.ansatte)} ansatte` : null].filter(Boolean).map(esc).join(" · ");
 const brregUrl = (orgnr) => `https://virksomhet.brreg.no/nb/oppslag/enheter/${encodeURIComponent(orgnr)}`;
 
-// Enkel visning: situasjonen i klartekst, i fast rekkefølge.
+// Enkel visning: én setning om situasjonen, og fire tema å velge mellom.
+let briefTopic = null;
 function renderBrief(d) {
   const a = d.ais, n = d.nyheter, r = d.sammenhenger;
   const noAis = aisMissing(d) || !a.fartoy;
@@ -1075,44 +1076,56 @@ function renderBrief(d) {
     noAis ? "" : `Langs kysten følges ${nf(a.fartoy)} fartøy, og ${nf(a.utenlandske)} av dem seiler under utenlandsk flagg.`,
   ].filter(Boolean).join(" ");
 
-  document.getElementById("brief").innerHTML = `
-    <p class="brief-lead">${esc(lead)}</p>
-
-    <section>
-      <h2><b>1</b>Nyheter</h2>
+  const topics = [
+    { id: "nyheter", title: "Nyheter", num: nf(n.siste_24), cap: "saker siste døgn", body: `
       <p>${n.siste_treff.length ? "Siste saker som nevner et emneord:" : "Ingen saker har nevnt et emneord de siste sju døgnene."}</p>
-      <ul>${n.siste_treff.slice(0, 4).map((t) => `<li>${artLink(t)}<small>${artMeta(t)} · emneord: ${t.treff.map(esc).join(", ")}</small></li>`).join("")}</ul>
-    </section>
-
-    <section>
-      <h2><b>2</b>Selskaper og organisasjoner</h2>
+      <ul>${n.siste_treff.slice(0, 5).map((t) => `<li>${artLink(t)}<small>${artMeta(t)} · emneord: ${t.treff.map(esc).join(", ")}</small></li>`).join("")}</ul>` },
+    { id: "selskaper", title: "Selskaper og organisasjoner", num: nf(r.topp_organisasjoner.length), cap: "gjenkjent i nyhetene, 72 t", body: `
       <p>${orgs.length ? "Mest omtalt de siste tre døgnene. Der navnet finnes entydig i Enhetsregisteret, står registeropplysningene under." : "Ingen organisasjoner er gjenkjent i nyhetene ennå."}</p>
       <ul>${orgs.map((o) => `<li><span><b>${go(o.navn, `sok=${o.navn}`)}</b> · ${plural(o.antall, "sak", "saker")}</span>
-        <small>${o.brreg ? `<a href="${brregUrl(o.brreg.orgnr)}" target="_blank" rel="noopener">Org.nr. ${esc(o.brreg.orgnr)}</a> · ${brregLine(o.brreg)}` : "Ikke entydig treff i Enhetsregisteret"}${o.steder.length ? `<br>Nevnt sammen med ${o.steder.map(esc).join(", ")}` : ""}</small></li>`).join("")}</ul>
-    </section>
-
-    <section>
-      <h2><b>3</b>Maritim</h2>
-      ${noAis ? `<p>${STATIC ? AIS_MISSING : "AIS-strømmen er ikke tilkoblet akkurat nå."}</p>` : `
+        <small>${o.brreg ? `<a href="${brregUrl(o.brreg.orgnr)}" target="_blank" rel="noopener">Org.nr. ${esc(o.brreg.orgnr)}</a> · ${brregLine(o.brreg)}` : "Ikke entydig treff i Enhetsregisteret"}${o.steder.length ? `<br>Nevnt sammen med ${o.steder.map(esc).join(", ")}` : ""}</small></li>`).join("")}</ul>` },
+    { id: "maritim", title: "Maritim", num: noAis ? "–" : nf(a.fartoy), cap: noAis ? "AIS ikke tilkoblet" : "fartøy langs kysten", body: noAis
+      ? `<p>${STATIC ? AIS_MISSING : "AIS-strømmen er ikke tilkoblet akkurat nå."}</p>` : `
       <p>${nf(a.fartoy)} fartøy sender posisjon langs norskekysten. ${nf(a.utenlandske)} er utenlandske, fra ${a.antall_flagg - 1} flaggstater.
         ${alerts ? `${plural(alerts, "varsel", "varsler")} er utløst nær overvåkingssonene siste døgn.` : "Ingen varsler er utløst nær overvåkingssonene siste døgn."}</p>
       <ul>
         ${flags.length ? `<li><span>Flest utenlandske fartøy</span><small>${flags.map((f) => `${esc(f.navn)} (${nf(f.antall)})`).join(", ")}</small></li>` : ""}
         ${zones.length ? `<li><span>Flest fartøy nær en sone</span><small>${zones.map((z) => `${esc(z.navn)} (${nf(z.naer)})`).join(", ")}</small></li>` : ""}
-      </ul>`}
-    </section>
-
-    <section>
-      <h2><b>4</b>Sammenhenger</h2>
+      </ul>
+      ${a.uten_flagg ? `<p class="brief-note">Flaggstaten leses fra de tre første sifrene i MMSI-nummeret (MID, en landkode). ${plural(a.uten_flagg, "AIS-sender", "AIS-sendere")} uten gyldig landkode, mest bøyer på fiskeredskap, er holdt utenfor.</p>` : ""}` },
+    { id: "sammenhenger", title: "Sammenhenger", num: nf(r.koblinger.length), cap: "koblinger mellom navn og steder", body: `
       <p>${links.length ? "Organisasjoner og steder som nevnes i de samme sakene. Det er en indikator, ikke en påvist forbindelse." : "Ingen koblinger mellom organisasjoner og steder de siste tre døgnene."}</p>
-      <ul>${links.map((k) => `<li><span><b>${esc(k.org)}</b> og <b>${esc(k.sted)}</b> · ${plural(k.antall, "sak", "saker")}</span><small>${artLink(k.saker[0])} · ${artMeta(k.saker[0])}</small></li>`).join("")}</ul>
-    </section>
+      <ul>${links.map((k) => `<li><span><b>${esc(k.org)}</b> og <b>${esc(k.sted)}</b> · ${plural(k.antall, "sak", "saker")}</span><small>${artLink(k.saker[0])} · ${artMeta(k.saker[0])}</small></li>`).join("")}</ul>` },
+  ];
+  const open = topics.find((t) => t.id === briefTopic);
+
+  document.getElementById("brief").innerHTML = `
+    <p class="brief-lead">${esc(lead)}</p>
+    <div class="topics" role="tablist" aria-label="Tema">
+      ${topics.map((t, i) => `
+        <button class="topic${t.id === briefTopic ? " on" : ""}" role="tab" aria-selected="${t.id === briefTopic}" data-topic="${t.id}">
+          <span class="topic-i">0${i + 1}</span>
+          <span class="topic-t">${esc(t.title)}</span>
+          <span class="topic-n">${t.num}</span>
+          <span class="topic-c">${esc(t.cap)}</span>
+        </button>`).join("")}
+    </div>
+    <div id="brief-panel" class="brief-panel${open ? "" : " empty"}" role="tabpanel">
+      ${open ? `<h2>${esc(open.title)}</h2>${open.body}` : `<p class="hint">Velg et tema over for å se hva som ligger under.</p>`}
+    </div>
 
     <p class="brief-more"><button id="brief-full">Se full oversikt →</button>
       <span>Kart, grafer, koblinger mellom kildene og kildelogg.</span></p>
     <p class="brief-foot">Kilder: NRK, E24, VG, Teknisk Ukeblad, regjeringen.no, Kystverket AIS, Enhetsregisteret og Kartverket.
       Alt er åpne data, og hvert oppslag logges med tidspunkt og fingeravtrykk.</p>`;
   document.getElementById("brief-full").addEventListener("click", () => setMode("full"));
+  document.querySelectorAll(".topic").forEach((b) => b.addEventListener("click", () => {
+    briefTopic = briefTopic === b.dataset.topic ? null : b.dataset.topic;
+    renderBrief(d);
+    const panel = document.getElementById("brief-panel");
+    panel.classList.add("enter");
+    if (briefTopic && panel.getBoundingClientRect().top > innerHeight * 0.75) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
 }
 
 // Tabell med en liten stolpe i tallkolonnen
@@ -1347,6 +1360,9 @@ function renderFull(d) {
   if (noAis) document.getElementById("dash-map").insertAdjacentHTML("beforeend", `<div class="map-note">${AIS_MISSING}</div>`);
   bars(document.getElementById("dash-flags"),
     a.flagg.filter((f) => f.navn !== "Norge").slice(0, 11).map((f) => ({ ...f, href: `flagg=${f.navn}` })), { unit: "fartøy", empty: noAis ? AIS_MISSING : undefined });
+  document.getElementById("dash-flags-note").innerHTML = noAis ? "" :
+    `Flaggstaten leses fra de tre første sifrene i fartøyets MMSI-nummer (MID, en landkode).${a.uten_flagg
+      ? ` ${plural(a.uten_flagg, "AIS-sender", "AIS-sendere")} uten gyldig landkode er holdt utenfor; langs kysten er det mest bøyer på fiskeredskap.` : ""}`;
   if (noAis) document.getElementById("dash-types").innerHTML = `<p class="hint">${AIS_MISSING}</p>`;
   else donut(document.getElementById("dash-types"), a.kategorier);
   bars(document.getElementById("dash-zones"), (noAis ? [] : a.soner).map((z) => ({

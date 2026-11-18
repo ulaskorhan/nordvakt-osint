@@ -322,7 +322,7 @@ a.chip { text-decoration: none; display: inline-block; }
 }
 .sec small { font-size: 12px; font-weight: 400; color: var(--muted); }
 
-.brief { max-width: 720px; margin: 24px auto 48px; font-size: 15px; line-height: 1.6; }
+.brief { max-width: 980px; margin: 24px auto 48px; font-size: 15px; line-height: 1.6; }
 .brief-lead { font-size: 19px; line-height: 1.55; margin: 0 0 8px; }
 .brief section { border-top: 1px solid var(--border); margin-top: 28px; padding-top: 20px; }
 .brief h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; font-size: 17px; font-weight: 600; }
@@ -386,6 +386,7 @@ a.chip { text-decoration: none; display: inline-block; }
 .rel-group h4 a { color: var(--text); }
 .rel-note { margin-top: 10px; }
 
+.card-note { margin: 0; padding: 6px 14px 10px; font-size: 11px; line-height: 1.45; color: var(--muted); border-top: 1px solid var(--border); }
 .kw-back { margin: 0 0 6px; padding: 4px 10px; font-size: 12px; }
 .kw-sum { margin: 2px 0 6px; }
 #dash-keywords .dash-list, #dash-places .dash-list { padding: 0; }
@@ -521,3 +522,48 @@ header { background: rgba(22, 42, 48, 0.96); }
 .tab.active { background: var(--raised); border-color: var(--border); color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
 .dash-tile:hover, .card:hover { border-color: #3f6570; }
 .dash-tile .value { color: var(--text); }
+
+/* Enkel visning: temavelger */
+.brief-lead { max-width: 760px; }
+.topics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 28px 0 0; }
+.topic {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left;
+  padding: 16px 16px 18px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 12px;
+  cursor: pointer; overflow: hidden;
+  transition: transform .25s ease, border-color .25s ease, background-color .25s ease, opacity .25s ease;
+}
+.topic::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--accent);
+  transform: scaleX(0); transform-origin: left; transition: transform .35s cubic-bezier(.2,.7,.2,1);
+}
+.topic:hover { border-color: var(--muted); transform: translateY(-2px); }
+.topic.on { background: var(--raised); border-color: var(--accent); }
+.topic.on::after { transform: scaleX(1); }
+.topics:has(.on) .topic:not(.on) { opacity: .62; }
+.topics:has(.on) .topic:not(.on):hover { opacity: 1; }
+.topic-i { font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: .1em; }
+.topic-t { font-size: 15px; font-weight: 600; line-height: 1.3; min-height: 2.6em; }
+.topic-n { font-size: 30px; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; margin-top: 6px; }
+.topic-c { font-size: 12px; color: var(--muted); line-height: 1.35; }
+.brief-panel { margin-top: 14px; padding: 4px 24px 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+.brief-panel.empty { padding: 18px 24px; border-style: dashed; background: none; }
+.brief-panel.empty p { margin: 0; }
+.brief-panel h2 { margin: 18px 0 6px; font-size: 17px; }
+.brief-panel.enter > * { animation: topic-in .45s cubic-bezier(.2,.7,.2,1) both; }
+.brief-panel.enter > *:nth-child(2) { animation-delay: .05s; }
+.brief-panel.enter > *:nth-child(3) { animation-delay: .1s; }
+.brief-panel.enter > *:nth-child(n+4) { animation-delay: .15s; }
+.brief-panel.enter { animation: panel-in .35s ease both; }
+@keyframes topic-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes panel-in { from { opacity: .4; } to { opacity: 1; } }
+.brief-note { font-size: 12px; margin-top: 12px !important; padding-top: 10px; border-top: 1px solid var(--border); }
+@media (prefers-reduced-motion: reduce) {
+  .topic, .topic::after { transition: none; }
+  .brief-panel.enter, .brief-panel.enter > * { animation: none; }
+}
+@media (max-width: 800px) {
+  .topics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .topic { padding: 14px; }
+  .topic-n { font-size: 24px; }
+  .brief-panel { padding: 4px 16px 14px; }
+}

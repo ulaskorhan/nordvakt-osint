@@ -1,0 +1,13 @@
+{
+  "name": "Nordvakt",
+  "short_name": "Nordvakt",
+  "description": "Åpne kilder om Norge: nyheter, registre og skipstrafikk, koblet sammen.",
+  "icons": [
+    {"src": "nordvakt.svg", "sizes": "any", "type": "image/svg+xml"},
+    {"src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"}
+  ],
+  "background_color": "#162a30",
+  "theme_color": "#162a30",
+  "display": "browser"
+}

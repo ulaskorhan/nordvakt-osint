@@ -1,17 +1,25 @@
 :root {
-  --bg: #0d1117;
-  --surface: #151b23;
-  --border: #242c36;
-  --text: #e6ebf1;
-  --muted: #8592a3;
-  --accent: #4fb3d9;
-  --warm: #f0d58a;
+  /* Samme «sjøkart»-palett som appen (static/style.css) */
+  --bg: #162a30;
+  --surface: #1d343b;
+  --border: #2f4c55;
+  --text: #ece7da;
+  --muted: #9db1b1;
+  --accent: #e3a83f;
+  --accent-ink: #1f1503;
+  --warm: #f2c87a;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --grid: rgba(236, 231, 218, 0.03);
 }
 
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 80% 60% at 75% 0%, rgba(227, 168, 63, 0.07), transparent 60%),
+    linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: auto, 44px 44px, 44px 44px;
   color: var(--text);
   font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -36,7 +44,7 @@ h1 { font-size: clamp(38px, 7vw, 64px); line-height: 1.05; letter-spacing: -0.02
 .actions { display: flex; gap: 12px; flex-wrap: wrap; }
 .button {
   display: inline-block; padding: 12px 20px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 15px;
-  background: var(--accent); color: #06121a; border: 1px solid var(--accent);
+  background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent);
 }
 .button:hover { filter: brightness(1.1); }
 .button.ghost { background: none; color: var(--text); border-color: var(--border); }
@@ -80,3 +88,8 @@ footer a:hover { color: var(--text); }
   .now { padding: 18px; }
   section { margin-bottom: 52px; }
 }
+
+.brand, .eyebrow, .now-head h2, .how .step, .static-note, footer span { font-family: var(--mono); }
+.eyebrow { letter-spacing: 0.14em; }
+.how .step { border-color: var(--accent); color: var(--accent); }
+.now { box-shadow: 0 1px 0 rgba(236, 231, 218, 0.04) inset, 0 18px 40px -24px rgba(5, 15, 18, 0.8); }

@@ -83,7 +83,7 @@ function renderVessels() {
     let m = markers.get(v.mmsi);
     const color = CATEGORY_COLORS[v.kategori] || CATEGORY_COLORS.ukjent;
     if (!m) {
-      m = L.circleMarker([v.lat, v.lon], { radius: 4, weight: 1, color: "#0d1117", fillColor: color, fillOpacity: 0.9 });
+      m = L.circleMarker([v.lat, v.lon], { radius: 4, weight: 1, color: "#162a30", fillColor: color, fillOpacity: 0.9 });
       m.on("click", () => selectVessel(v.mmsi));
       m.addTo(vesselLayer);
       markers.set(v.mmsi, m);
@@ -201,15 +201,15 @@ const CARD_STYLE = [
   { selector: "node", style: {
     shape: "round-rectangle", width: "data(w)", height: "data(h)", label: "data(text)",
     "text-wrap": "wrap", "text-max-width": 300, "text-valign": "center", "text-halign": "center",
-    "font-size": 10, "line-height": 1.35, color: "#d8dee6",
-    "background-color": "#151b23", "border-width": 1, "border-color": "data(farge)",
+    "font-size": 10, "line-height": 1.35, color: "#ece7da",
+    "background-color": "#1d343b", "border-width": 1, "border-color": "data(farge)",
   } },
   { selector: "edge", style: {
-    width: 1, "line-color": "#2f3843", "curve-style": "taxi", "taxi-direction": "horizontal", "taxi-turn": "50%",
+    width: 1, "line-color": "#3a5961", "curve-style": "taxi", "taxi-direction": "horizontal", "taxi-turn": "50%",
   } },
   { selector: "edge.hl", style: {
-    "line-color": "#8592a3", width: 1.5, label: "data(label)", "font-size": 9, color: "#d8dee6",
-    "text-background-color": "#0d1117", "text-background-opacity": 1, "text-background-padding": 2,
+    "line-color": "#8592a3", width: 1.5, label: "data(label)", "font-size": 9, color: "#ece7da",
+    "text-background-color": "#162a30", "text-background-opacity": 1, "text-background-padding": 2,
   } },
   { selector: ".faded", style: { opacity: 0.15 } },
 ];
@@ -228,7 +228,7 @@ const cy = cytoscape({
   style: [
     ...CARD_STYLE,
     { selector: 'node[kind="hoved"]', style: {
-      "background-color": "#173e4d", "border-color": "#4fb3d9", "border-width": 2, "font-size": 11, "font-weight": "bold",
+      "background-color": "#1e4a5a", "border-color": "#4fb3d9", "border-width": 2, "font-size": 11, "font-weight": "bold",
     } },
     { selector: 'node[kind="uutvidet"]', style: { "border-style": "dashed", "border-color": "#4fb3d9", color: "#8592a3" } },
     { selector: "node[?delt]", style: { "border-width": 3, "background-color": "#262010" } },
@@ -770,7 +770,7 @@ function renderEntityMap(r) {
     }
     const center = x.id === r.entity.id;
     L.circleMarker([x.lat, x.lon], {
-      radius: center ? 9 : 6, weight: center ? 2 : 1, color: center ? "#ffffff" : "#0d1117", fillColor: color, fillOpacity: 0.95,
+      radius: center ? 9 : 6, weight: center ? 2 : 1, color: center ? "#ffffff" : "#162a30", fillColor: color, fillOpacity: 0.95,
     }).bindTooltip(esc(x.label)).on("click", () => { location.hash = entityHref(x.id); }).addTo(entityLayer);
   }
   if (located.length === 1) entityMap.setView([located[0].lat, located[0].lon], located[0].type === "zone" ? 11 : 12);
@@ -789,9 +789,9 @@ function renderEntityGraph(r) {
       container: document.getElementById("entity-graph"),
       style: [
         ...CARD_STYLE,
-        { selector: 'node[kind="center"]', style: { "background-color": "#1f2a36", "border-width": 2, "font-size": 11, "font-weight": "bold" } },
+        { selector: 'node[kind="center"]', style: { "background-color": "#24404a", "border-width": 2, "font-size": 11, "font-weight": "bold" } },
         { selector: 'node[kind="mer"]', style: { "border-style": "dashed", color: "#8592a3" } },
-        { selector: 'node[kind="rolle"]', style: { color: "#b4bfcc" } },
+        { selector: 'node[kind="rolle"]', style: { color: "#c9d1cb" } },
       ],
       minZoom: 0.2,
       maxZoom: 1.5,
@@ -979,7 +979,7 @@ function donut(el, allRows) {
   if (!total) { el.innerHTML = `<p class="hint">Ingen skipstyper mottatt ennå.</p>${note}`; return; }
   const top = rows.slice(0, 6).map((r) => ({ ...r, farge: CATEGORY_COLORS[r.navn], tekst: TYPE_NAMES[r.navn] || r.navn }));
   const rest = rows.slice(6).reduce((s, r) => s + r.antall, 0);
-  if (rest) top.push({ navn: "andre", antall: rest, farge: "#3a434f", tekst: "Andre" });
+  if (rest) top.push({ navn: "andre", antall: rest, farge: "#3f5a62", tekst: "Andre" });
   const R = 70, r0 = 48, C = 90;
   let ang = -Math.PI / 2;
   const pt = (rad, a) => `${(C + rad * Math.cos(a)).toFixed(2)} ${(C + rad * Math.sin(a)).toFixed(2)}`;
@@ -1011,7 +1011,7 @@ function newsColumns(el, perHour, refEpoch) {
   const hourOf = (i) => new Date(now.getTime() - (71 - i) * 3600e3);
   const fmt = (d) => d.toLocaleString("no-NO", { weekday: "short", hour: "2-digit", minute: "2-digit" });
   const cols = perHour.map((n, i) => `<div class="col" data-tip="<b>${esc(fmt(hourOf(i)))}</b><br>${n} ${n === 1 ? "sak" : "saker"}"><i style="height:${n ? Math.max(3, (n / max) * 100) : 0}%"></i></div>`).join("");
-  const ticks = [0, 12, 24, 36, 48, 60, 71].map((i) => `<span style="left:${((i + 0.5) / 72) * 100}%">${esc(fmt(hourOf(i)))}</span>`).join("");
+  const ticks = [0, 24, 48, 71].map((i) => `<span style="left:${((i + 0.5) / 72) * 100}%">${esc(fmt(hourOf(i)))}</span>`).join("");
   el.innerHTML = `
     <div class="cols-wrap">
       <div class="cols-y"><span>${max}</span><span>${Math.round(max / 2)}</span><span>0</span></div>
@@ -1035,7 +1035,7 @@ function renderDashMap(a) {
   for (const [lat, lon, mmsi, foreign] of sorted) {
     L.circleMarker([lat, lon], {
       radius: foreign ? 3 : 2, stroke: false, fillOpacity: foreign ? 0.9 : 0.55,
-      fillColor: foreign ? "#4fb3d9" : "#5b6675",
+      fillColor: foreign ? "#4fb3d9" : "#5d767d",
     }).on("click", () => { if (!STATIC) location.hash = `e=vessel:${mmsi}`; }).addTo(dashLayer);
   }
   for (const z of zonesCache) {
@@ -1243,7 +1243,7 @@ function renderNewsMap(points) {
   dashNewsMap.invalidateSize();
   dashNewsLayer.clearLayers();
   for (const p of [...points].sort((x, y) => y.antall - x.antall)) {
-    L.circleMarker([p.lat, p.lon], { radius: 4 + Math.sqrt(p.antall) * 3, color: "#0d1117", weight: 1, fillColor: "#7ee0c3", fillOpacity: 0.75 })
+    L.circleMarker([p.lat, p.lon], { radius: 4 + Math.sqrt(p.antall) * 3, color: "#162a30", weight: 1, fillColor: "#7ee0c3", fillOpacity: 0.75 })
       .bindPopup(`<b>${esc(p.navn)}</b> · ${plural(p.antall, "sak", "saker")}<br>${p.saker.map((s) => `${artLink(s)}<br><small>${artMeta(s)}</small>`).join("<br>")}`, { maxWidth: 280 })
       .addTo(dashNewsLayer);
   }
@@ -1482,7 +1482,7 @@ function renderTrendChart() {
     const r = svg.getBoundingClientRect();
     const i = Math.max(0, Math.min(n - 1, Math.round(((e.clientX - r.left) * (W / r.width) - m.l) / (n === 1 ? 1 : iw / (n - 1)))));
     cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("visibility", "visible");
-    hd.innerHTML = series.map((s) => (s.v[i] == null ? "" : `<circle cx="${x(i)}" cy="${y(s.v[i])}" r="4.5" fill="${s.color}" stroke="#151b23" stroke-width="2"/>`)).join("");
+    hd.innerHTML = series.map((s) => (s.v[i] == null ? "" : `<circle cx="${x(i)}" cy="${y(s.v[i])}" r="4.5" fill="${s.color}" stroke="#1d343b" stroke-width="2"/>`)).join("");
     const head = daily ? new Date(`${labels[i]}T12:00:00`).toLocaleDateString("no-NO", { weekday: "long", day: "numeric", month: "long" }) : `Uke ${weekNo(labels[i])} (fra ${dayLabel(labels[i])})`;
     const rows = covered[i]
       ? [...series].sort((a, b) => (b.v[i] ?? -1) - (a.v[i] ?? -1)).map((s) => `<div class="tt-row"><i style="background:${s.color}"></i>${esc(s.navn)}<b>${fmtV(s.v[i] ?? 0)}</b></div>`).join("") + `<div class="tt-foot">${nf(totals[i])} saker totalt</div>`
@@ -1514,7 +1514,7 @@ function renderMovers(d) {
 }
 
 // Matrise: ord med treff, gruppert. Sekvensiell blåskala etter antall felles saker.
-const SEQ = ["#1f2a37", "#184f95", "#1c5cab", "#256abf", "#3987e5", "#5598e7", "#86b6ef"];
+const SEQ = ["#24404a", "#184f95", "#1c5cab", "#256abf", "#3987e5", "#5598e7", "#86b6ef"];
 function renderMatrix(d) {
   const terms = d.ord.filter((o) => o.totalt > 0);
   const n = new Map(d.par.map((p) => [`${p.a}|${p.b}`, p]));

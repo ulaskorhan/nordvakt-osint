@@ -14,7 +14,7 @@ import os
 import logging
 from pathlib import Path
 
-from app import ais, barentswatch, dashboard, news, trends
+from app import ais, barentswatch, dashboard, news, scenarios, trends
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -64,6 +64,7 @@ async def main(seconds: int, out: Path) -> None:
     trend = trends.summary(previous_weeks())
     (out / "trends.json").write_text(json.dumps(trend, ensure_ascii=False), encoding="utf-8")
     logging.info("Trender: %d uker dekket, fra %s", sum(trend["dekket"]), trend["dekning_fra"])
+    (out / "scenarios.json").write_text(json.dumps(scenarios.summary(), ensure_ascii=False), encoding="utf-8")
     (out / "dashboard.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     (out / "zones.json").write_text(json.dumps(store.zones, ensure_ascii=False), encoding="utf-8")
     logging.info("Øyeblikksbilde: %d fartøy, %d AIS-meldinger, %d saker siste døgn",

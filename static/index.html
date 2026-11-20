@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#162a30">
   <title>Nordvakt</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
-  <link rel="stylesheet" href="/static/style.css?v=32">
+  <link rel="stylesheet" href="/static/style.css?v=34">
 </head>
 <body>
   <header>
@@ -18,6 +18,7 @@
     <nav>
       <button class="tab active" data-view="oversikt">Oversikt</button>
       <button class="tab" data-view="trender">Trender</button>
+      <button class="tab" data-view="scenarier">Scenarier</button>
       <button class="tab" data-view="sok">Søk</button>
       <button class="tab" data-view="nyheter">Nyheter</button>
       <button class="tab" data-view="nettverk">Selskaper</button>
@@ -144,6 +145,26 @@
             </div>
           </div>
         </div>
+      </div>
+      <p class="static-note">Nordvakt oppdateres hver time med nye data fra åpne kilder. Fritekstsøk, sanntidskart og
+        selskapsnettverk finnes i den fullstendige versjonen, som kan kjøres på egen maskin.
+        <a href="https://github.com/ulaskorhan/nordvakt-osint#kjøre-lokalt" target="_blank" rel="noopener">Kildekode og oppsett på GitHub</a>.</p>
+    </section>
+
+    <section id="view-scenarier" class="view">
+      <div class="dash">
+        <div class="dash-head">
+          <div>
+            <h1>Scenarier</h1>
+            <span id="scen-updated" class="hint"></span>
+          </div>
+        </div>
+        <p class="scen-intro">Hva kan skje videre? Hvert kort stiller ett spørsmål, viser hva som skjedde i lignende situasjoner før,
+          og beskriver tre mulige utfall. Under hvert utfall står tegnene vi ville sett i nyhetene om det er på vei, og hvor ofte de
+          faktisk nevnes nå.</p>
+        <p class="scen-disclaimer">Historisk kontekst, ikke prognose og ikke investeringsråd. Nordvakt rangerer ikke scenariene:
+          flere treff betyr ikke at et utfall er mer sannsynlig, bare at tegnene nevnes oftere.</p>
+        <div id="scen-cards"><p class="hint">Henter scenariene…</p></div>
       </div>
       <p class="static-note">Nordvakt oppdateres hver time med nye data fra åpne kilder. Fritekstsøk, sanntidskart og
         selskapsnettverk finnes i den fullstendige versjonen, som kan kjøres på egen maskin.
@@ -344,6 +365,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
-  <script src="/static/app.js?v=35"></script>
+  <script src="/static/app.js?v=37"></script>
 </body>
 </html>

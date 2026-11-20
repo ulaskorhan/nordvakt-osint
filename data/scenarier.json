@@ -1,0 +1,133 @@
+{
+  "_merknad": "Scenariokort. Historiske paralleller er skrevet for hånd med kilde. Indikatorene er regulære uttrykk mot tittel og ingress, og telles bare i saker som også treffer kortets «kontekst». Ingen sannsynligheter: siden viser bare hvilke tegn som dukker opp i nyhetene.",
+  "dager": 14,
+  "grunnlag_dager": 28,
+  "kort": [
+    {
+      "id": "ukraina",
+      "tittel": "Krigen i Ukraina",
+      "spørsmål": "Går krigen mot en slutt, en frossen konflikt eller en opptrapping?",
+      "kontekst": "russland|russisk|ukrain|putin|zelensk|kyiv|kijev|moskva|kreml|donbas|krim",
+      "paralleller": [
+        {
+          "navn": "Koreakrigen, 1950–1953",
+          "tekst": "Endte i en våpenstillstand, ikke en fredsavtale. Frontlinjen ble i praksis grense, og konflikten er formelt uløst i dag.",
+          "peker_mot": "B",
+          "kilde": {"navn": "Store norske leksikon", "lenke": "https://snl.no/Koreakrigen"}
+        },
+        {
+          "navn": "Vinterkrigen, 1939–1940",
+          "tekst": "Moskva-freden: Finland måtte avstå omtrent en tidel av landet, men beholdt selvstendigheten. Krigen sluttet, men på stormaktens vilkår.",
+          "peker_mot": "A",
+          "kilde": {"navn": "Store norske leksikon", "lenke": "https://snl.no/Vinterkrigen"}
+        },
+        {
+          "navn": "Minsk-avtalene, 2014–2015",
+          "tekst": "Våpenhvilene i Donbas holdt aldri helt, og konflikten lå på vent i flere år. I 2022 fulgte fullskala invasjon.",
+          "peker_mot": "B → C",
+          "kilde": {"navn": "Store norske leksikon", "lenke": "https://snl.no/Minsk-avtalene"}
+        },
+        {
+          "navn": "Daytonavtalen, 1995",
+          "tekst": "Krigen i Bosnia endte etter sterkt amerikansk press og forhandlinger i USA. Freden har holdt, men landet er fortsatt delt.",
+          "peker_mot": "A",
+          "kilde": {"navn": "Wikipedia", "lenke": "https://en.wikipedia.org/wiki/Dayton_Agreement"}
+        }
+      ],
+      "scenarier": [
+        {
+          "id": "A", "navn": "Forhandlet slutt",
+          "tekst": "Partene blir enige om våpenhvile eller fredsavtale, ofte med press fra stormaktene. Vilkårene kan være gode eller dårlige for Ukraina; at krigen slutter, sier ikke hvordan.",
+          "indikatorer": [
+            {"navn": "Våpenhvile", "mønster": "våpenhvile|våpenkvile|våpenstillstand"},
+            {"navn": "Fredsforhandlinger", "mønster": "fredsforhandling|fredssamtale|fredsavtale|fredsplan|fredsprosess|forhandlingsbord"},
+            {"navn": "Toppmøter", "mønster": "toppmøte|møte\\w* (med )?(putin|zelensk)|(putin|zelensk)\\w* (og|møter|møtte) (trump|xi)|(trump|xi) (og|møter|møtte) (putin|zelensk)"},
+            {"navn": "Sanksjoner lettes", "mønster": "(lette|letter|oppheve|opphever|fjerne|fjerner)\\w* (på )?sanksjon|sanksjonslettelse"}
+          ]
+        },
+        {
+          "id": "B", "navn": "Frossen konflikt",
+          "tekst": "Kampene avtar uten at noe er løst. Frontlinjen blir stående, og konflikten kan blusse opp igjen senere.",
+          "indikatorer": [
+            {"navn": "Fastlåst front", "mønster": "fastlåst|stillstand|frontlinj|skyttergrav"},
+            {"navn": "Buffersone og garantier", "mønster": "buffersone|demilitariser|fredsbevarende|fredsstyrke|sikkerhetsgaranti"},
+            {"navn": "Okkuperte områder", "mønster": "okkuperte områder|okkupert|annekter|avstå"}
+          ]
+        },
+        {
+          "id": "C", "navn": "Opptrapping",
+          "tekst": "Krigen blir mer omfattende: nye offensiver, tyngre angrep, eller at den smitter over på naboland.",
+          "indikatorer": [
+            {"navn": "Offensiver", "mønster": "offensiv|storangrep|gjennombrudd"},
+            {"navn": "Luftangrep", "mønster": "rakettangrep|droneangrep|luftangrep|massivt angrep|bombing"},
+            {"navn": "Mobilisering", "mønster": "mobiliser"},
+            {"navn": "Kjernevåpen", "mønster": "atomvåpen|kjernevåpen|atomtrussel"},
+            {"navn": "Nato-land berørt", "mønster": "luftrom|artikkel 5|nato-land"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "norsk-okonomi",
+      "tittel": "Norsk økonomi",
+      "spørsmål": "Går norsk økonomi mot en myk landing, vedvarende press eller nedgangstider?",
+      "kontekst": "norges bank|styringsrent|renten|renta|rentekutt|renteheving|kronen|krona|kronekurs|norsk økonomi|prisvekst|oljepris|oljefond|handlingsregel|statsbudsjett|arbeidsledig|ledighet|boligpris|lønnsoppgjør",
+      "paralleller": [
+        {
+          "navn": "Oljeprisfallet, 1986",
+          "tekst": "Oljeprisen falt kraftig, og kronen ble devaluert med tolv prosent i mai 1986. Norge gikk inn i flere år med svak vekst.",
+          "peker_mot": "C",
+          "kilde": {"navn": "Store norske leksikon", "lenke": "https://snl.no/devaluering"}
+        },
+        {
+          "navn": "Bankkrisen, 1988–1993",
+          "tekst": "Etter dereguleringer og nedgangstid nådde krisen toppen i 1991–92, da staten overtok aksjene i de tre største forretningsbankene.",
+          "peker_mot": "C",
+          "kilde": {"navn": "Store norske leksikon", "lenke": "https://snl.no/bankkriser_i_Norge"}
+        },
+        {
+          "navn": "Finanskrisen, 2008–2009",
+          "tekst": "Norges Bank satte renten ned fra 5,75 til 1,25 prosent på under et år. Norge kom raskere ut av krisen enn de fleste land.",
+          "peker_mot": "A",
+          "kilde": {"navn": "Norges Bank", "lenke": "https://www.norges-bank.no/tema/pengepolitikk/Styringsrenten/Styringsrenten-Oversikt-over-rentemoter-og-endringer-i-styringsrenten-/"}
+        },
+        {
+          "navn": "Oljeprisfallet, 2014–2016",
+          "tekst": "Oljeprisen falt fra over 100 til rundt 30 dollar fatet. Kronen svekket seg, ledigheten steg på Vestlandet, og renten ble satt ned til 0,5 prosent i 2016.",
+          "peker_mot": "C → A",
+          "kilde": {"navn": "Wikipedia", "lenke": "https://en.wikipedia.org/wiki/2010s_oil_glut"}
+        }
+      ],
+      "scenarier": [
+        {
+          "id": "A", "navn": "Myk landing",
+          "tekst": "Prisveksten avtar uten at ledigheten stiger mye, og renten kan settes ned.",
+          "indikatorer": [
+            {"navn": "Rentekutt", "mønster": "rentekutt|kutter renten|setter ned renten|lavere rente|renta ned|renten ned"},
+            {"navn": "Lavere prisvekst", "mønster": "prisveksten (avtar|faller|går ned)|lavere prisvekst|lavere inflasjon|inflasjonen (faller|avtar|går ned)"},
+            {"navn": "Sterkere krone", "mønster": "sterkere krone|kronen styrk|krona styrk"}
+          ]
+        },
+        {
+          "id": "B", "navn": "Vedvarende press",
+          "tekst": "Prisene og renten holder seg høye lenger enn ventet, og husholdningene merker det.",
+          "indikatorer": [
+            {"navn": "Renten opp eller uendret", "mønster": "renteheving|hever renten|setter opp renten|uendret rente|holder renten"},
+            {"navn": "Høy prisvekst", "mønster": "høy prisvekst|høy inflasjon|dyrtid|prisene (stiger|øker)"},
+            {"navn": "Svak krone", "mønster": "svak krone|svakere krone|kronen svekk|krona svekk"}
+          ]
+        },
+        {
+          "id": "C", "navn": "Nedgangstider",
+          "tekst": "Et sjokk utenfra, som et oljeprisfall eller en finanskrise, gir færre jobber og flere konkurser.",
+          "indikatorer": [
+            {"navn": "Oljeprisfall", "mønster": "oljeprisen (faller|stuper|synker)|oljeprisfall|lavere oljepris"},
+            {"navn": "Permitteringer", "mønster": "permitter|nedbemann|oppsigelse"},
+            {"navn": "Økt ledighet", "mønster": "arbeidsledighet|ledigheten (øker|stiger)|flere ledige"},
+            {"navn": "Konkurser", "mønster": "konkurs"}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -3,7 +3,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 // Statisk modus (GitHub Pages): ingen server, bare et øyeblikksbilde av oversikten
 // som GitHub Actions lager hver time. Se scripts/snapshot.py.
 const STATIC = window.NORDVAKT_STATIC === true;
-const STATIC_FILES = { "/api/dashboard": "data/dashboard.json", "/api/zones": "data/zones.json", "/api/trends": "data/trends.json" };
+const STATIC_FILES = { "/api/dashboard": "data/dashboard.json", "/api/zones": "data/zones.json", "/api/trends": "data/trends.json", "/api/scenarios": "data/scenarios.json" };
 if (STATIC) document.body.classList.add("static");
 const getJSON = async (url) => {
   if (STATIC && !STATIC_FILES[url]) throw new Error(`Ikke tilgjengelig i statisk versjon: ${url}`);
@@ -25,6 +25,7 @@ function showView(view) {
   if (view === "nyheter") loadNews();
   if (view === "oversikt") loadDashboard();
   if (view === "trender") loadTrends();
+  if (view === "scenarier") loadScenarios();
 }
 function goTo(view) {
   history.replaceState(null, "", `#${view}`);
@@ -654,7 +655,7 @@ const typeDot = (t) => `<i class="type-dot" style="background:${TYPES[t]?.farge 
 const trunc = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 function route() {
-  if (STATIC) { showView(location.hash === "#trender" ? "trender" : "oversikt"); return; }
+  if (STATIC) { showView(["#trender", "#scenarier"].includes(location.hash) ? location.hash.slice(1) : "oversikt"); return; }
   const h = decodeURIComponent(location.hash.slice(1));
   if (h.startsWith("e=")) { showView("sok"); openEntity(h.slice(2)); }
   else if (h.startsWith("sok=")) { showView("sok"); runSearch(h.slice(4)); }
@@ -1730,3 +1731,56 @@ async function loadTrends() {
 }
 
 route();
+
+
+// ---------- Scenarier ----------
+// Kortene er skrevet for hånd (data/scenarier.json); bare indikatortallene beregnes.
+let scenData = null;
+async function loadScenarios() {
+  const el = document.getElementById("scen-cards");
+  try {
+    scenData = await getJSON("/api/scenarios");
+  } catch {
+    el.innerHTML = '<p class="hint">Kunne ikke hente scenariene akkurat nå.</p>';
+    return;
+  }
+  const d = scenData;
+  document.getElementById("scen-updated").textContent =
+    `Tegn talt i ${plural(d.saker, "nyhetssak", "nyhetssaker")} siste ${d.dager} dager · oppdatert ${new Date(d.tid * 1000).toLocaleString("no-NO", { weekday: "long", hour: "2-digit", minute: "2-digit" })}`;
+  el.innerHTML = d.kort.map((c) => `
+    <article class="scen">
+      <div class="scen-head">
+        <h2>${esc(c.tittel)}</h2>
+        <p class="scen-q">${esc(c.spørsmål)}</p>
+      </div>
+
+      <div class="scen-now">
+        <span class="scen-label">Situasjonen nå</span>
+        <p>${plural(c.kontekst.antall, "sak", "saker")} om temaet siste ${d.dager} dager. Nyeste:</p>
+        <ul>${c.kontekst.saker.map((t) => `<li>${artLink(t)} <small>${artMeta(t)}</small></li>`).join("")}</ul>
+      </div>
+
+      <span class="scen-label">Historiske paralleller</span>
+      <div class="scen-par">${c.paralleller.map((p) => `
+        <div class="par">
+          <div class="par-top"><b>${esc(p.navn)}</b><span class="par-to">Ligner ${esc(p.peker_mot)}</span></div>
+          <p>${esc(p.tekst)}</p>
+          <a href="${esc(safeUrl(p.kilde.lenke))}" target="_blank" rel="noopener">Kilde: ${esc(p.kilde.navn)} ↗</a>
+        </div>`).join("")}</div>
+
+      <span class="scen-label">Tre mulige utfall</span>
+      <div class="scen-out">${c.scenarier.map((s) => `
+        <div class="out">
+          <div class="out-head"><span class="out-id">${esc(s.id)}</span><h3>${esc(s.navn)}</h3></div>
+          <p class="out-text">${esc(s.tekst)}</p>
+          <div class="out-ind-label">Tegn i nyhetene, siste ${d.dager} dager</div>
+          <ul class="ind">${s.indikatorer.map((i) => `
+            <li class="${i.antall ? "on" : ""}" ${i.vanlig != null ? `data-tip="${esc(i.navn)}<br>${plural(i.antall, "sak", "saker")} nå, vanligvis ${nf(i.vanlig)}"` : ""}>
+              <span>${esc(i.navn)}</span><b>${nf(i.antall)}${i["økning"] ? ' <em title="Mer enn vanlig">↑</em>' : ""}</b></li>`).join("")}</ul>
+          ${s.saker.length ? `<details class="out-saker"><summary>${plural(s.antall, "sak", "saker")} med disse tegnene</summary>
+            <ul>${s.saker.map((t) => `<li>${artLink(t)}<small>${artMeta(t)} · ${t.tegn.map(esc).join(", ")}</small></li>`).join("")}</ul></details>`
+            : `<p class="hint out-none">Ingen av tegnene er nevnt siste ${d.dager} dager.</p>`}
+        </div>`).join("")}</div>
+    </article>`).join("");
+  wireInteractive(el);
+}
